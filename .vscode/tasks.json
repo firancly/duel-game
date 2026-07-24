@@ -1,0 +1,42 @@
+//* CTRL + SHIFT + B to run task
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "rbxtsc: watch",
+			"type": "npm",
+			"script": "watch",
+			"isBackground": true,
+			"problemMatcher": {
+				"base": "$tsc-watch",
+				"fileLocation": ["relative", "${workspaceFolder}"]
+			},
+			"presentation": {
+				"panel": "dedicated",
+				"group": "roblox-ts"
+			}
+		},
+		{
+			"label": "rojo: serve",
+			"type": "shell",
+			"command": "rojo",
+			"args": ["serve"],
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": {
+				"panel": "dedicated",
+				"group": "roblox-ts"
+			}
+		},
+		{
+			"label": "dev: watch + serve",
+			"dependsOn": ["rbxtsc: watch", "rojo: serve"],
+			"dependsOrder": "parallel",
+			"problemMatcher": [],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		}
+	]
+}
