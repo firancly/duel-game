@@ -1,1 +1,1 @@
-print("Hello from server")
+print("Hello from server");

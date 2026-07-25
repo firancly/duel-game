@@ -11,6 +11,6 @@ export interface ItemData {
 
 export interface DragStateTable {
 	id: number;
-	sourceSlot: any;
-	mouseOffSet: Vector2
+	sourceSlot: unknown;
+	mouseOffSet: Vector2;
 }

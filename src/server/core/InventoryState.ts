@@ -2,9 +2,9 @@ import Settings from "shared/Settings";
 
 export interface ItemInstance {
 	UUID: string;
-	id: number;
+	id: string;
 	amount: number;
-	metadata?: object;
+	metadata?: Map<string, unknown>;
 }
 
 export interface PlayerSettings {
