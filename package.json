@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@rbxts/compiler-types": "^3.0.0-types.0",
     "@rbxts/types": "^1.0.940",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
@@ -22,7 +23,8 @@
     "eslint-plugin-roblox-ts": "^1.4.1",
     "prettier": "^3.9.6",
     "roblox-ts": "^3.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0"
   },
   "dependencies": {
     "@rbxts/services": "^1.6.0"
