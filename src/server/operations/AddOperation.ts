@@ -18,10 +18,11 @@ export interface AddResult {
 	equippedUUID?: string; // UUID of the item that was automatically equipped
 }
 
+// Remove Amount and Stack amount attributes
 function normalizeMetadataOverrides(
 	metadataOverrides: Map<string, unknown> | undefined,
 ): [Map<string, unknown> | undefined, number | undefined] {
-	if (metadataOverrides === undefined) {
+	if (metadataOverrides === undefined && !typeIs(metadataOverrides, "table")) {
 		return [undefined, undefined];
 	}
 
@@ -35,13 +36,8 @@ function normalizeMetadataOverrides(
 		amountFromMeta = normalized.get("StackAmount");
 	}
 
-	if (typeIs(amountFromMeta, "string")) {
-		amountFromMeta = tonumber(amountFromMeta);
-	}
-
-	if (!typeIs(amountFromMeta, "number")) {
-		amountFromMeta = undefined;
-	}
+	if (typeIs(amountFromMeta, "string")) amountFromMeta = tonumber(amountFromMeta);
+	if (!typeIs(amountFromMeta, "number")) amountFromMeta = undefined;
 
 	normalized.delete("Amount");
 	normalized.delete("StackAmount");

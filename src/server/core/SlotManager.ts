@@ -7,6 +7,10 @@ export class SlotManager {
 		state.hotbar[slot] = uuid;
 	}
 
+	static clearHotbarSlot(state: InventoryStateType, slot: number) {
+		state.hotbar[slot] = undefined; // Hole preserved (Static)
+	}
+
 	static findEmptyHotbarSlot(state: InventoryStateType): number | undefined {
 		const maxSlots = state.settings.maxHotbarSlots;
 		for (let i = 0; i < maxSlots; i++) {
