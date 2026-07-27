@@ -1,4 +1,4 @@
-import { InventoryStateType, ItemInstance, PlayerSettings } from "server/core/InventoryState";
+import { InventoryStateType, ItemInstance, PlayerSettings } from "server/Inventory/core/InventoryState";
 
 export enum ActionType {
 	INIT = "Init", // Full state sync (join/respawn)

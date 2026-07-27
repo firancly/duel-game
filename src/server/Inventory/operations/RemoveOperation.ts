@@ -1,6 +1,6 @@
-import { InventoryStateType } from "server/core/InventoryState";
-import { LimitChecker } from "server/core/LimitChecker";
-import { SlotManager } from "server/core/SlotManager";
+import { InventoryStateType } from "server/Inventory/core/InventoryState";
+import { LimitChecker } from "server/Inventory/core/LimitChecker";
+import { SlotManager } from "server/Inventory/core/SlotManager";
 
 export interface RemoveResult {
 	success: boolean;

@@ -1,5 +1,5 @@
 import { ReplicatedStorage } from "@rbxts/services";
-import { InventoryStateType, ItemInstance, PlayerSettings } from "server/core/InventoryState";
+import { InventoryStateType, ItemInstance, PlayerSettings } from "server/Inventory/core/InventoryState";
 import { Actions, ActionType } from "./Actions";
 
 function getOrCreateRemotesFolder(): Folder {

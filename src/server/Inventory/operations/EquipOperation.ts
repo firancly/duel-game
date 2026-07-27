@@ -1,6 +1,6 @@
-import { InventoryStateType } from "server/core/InventoryState";
-import { SlotManager } from "server/core/SlotManager";
-import { ItemSpawner } from "server/world/ItemSpawner";
+import { InventoryStateType } from "server/Inventory/core/InventoryState";
+import { SlotManager } from "server/Inventory/core/SlotManager";
+import { ItemSpawner } from "server/Inventory/world/ItemSpawner";
 
 export interface EquipResult {
 	success: boolean;

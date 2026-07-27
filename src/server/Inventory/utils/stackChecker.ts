@@ -1,5 +1,5 @@
-import { InventoryStateType, ItemInstance } from "server/core/InventoryState";
-import { LimitChecker } from "server/core/LimitChecker";
+import { InventoryStateType, ItemInstance } from "server/Inventory/core/InventoryState";
+import { LimitChecker } from "server/Inventory/core/LimitChecker";
 import Settings from "shared/Settings";
 
 export class StackChecker {

@@ -1,8 +1,8 @@
-import { InventoryStateType } from "server/core/InventoryState";
-import { SlotManager } from "server/core/SlotManager";
+import { InventoryStateType } from "server/Inventory/core/InventoryState";
+import { SlotManager } from "server/Inventory/core/SlotManager";
 import { EquipOperation } from "./EquipOperation";
 import { RemoveOperation, RemoveOptions } from "./RemoveOperation";
-import { ItemSpawner } from "server/world/ItemSpawner";
+import { ItemSpawner } from "server/Inventory/world/ItemSpawner";
 
 export interface DropResult {
 	success: boolean;

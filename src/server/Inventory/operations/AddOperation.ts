@@ -1,9 +1,9 @@
-import { LimitChecker } from "server/core/LimitChecker";
-import Generate from "server/utils/uuid";
-import { InventoryStateType, ItemInstance } from "server/core/InventoryState";
-import { MetaDataParser } from "server/utils/metaDataParser";
-import { SlotManager } from "server/core/SlotManager";
-import { StackChecker } from "server/utils/stackChecker";
+import { LimitChecker } from "server/Inventory/core/LimitChecker";
+import Generate from "server/Inventory/utils/uuid";
+import { InventoryStateType, ItemInstance } from "server/Inventory/core/InventoryState";
+import { MetaDataParser } from "server/Inventory/utils/metaDataParser";
+import { SlotManager } from "server/Inventory/core/SlotManager";
+import { StackChecker } from "server/Inventory/utils/stackChecker";
 import Settings from "shared/Settings";
 import { DropOperation } from "./DropOperation";
 import { EquipOperation } from "./EquipOperation";

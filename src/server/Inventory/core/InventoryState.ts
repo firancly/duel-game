@@ -36,8 +36,7 @@ export class InventoryState implements InventoryStateType {
 	equippedItemUUID?: string;
 	weight = 0;
 	settings: PlayerSettings;
-
-	private died = false;
+	died = false;
 
 	constructor(player: Player) {
 		this.player = player;
@@ -50,5 +49,21 @@ export class InventoryState implements InventoryStateType {
 			maxHotbarSlots: Settings.Hotbar.maxSlots,
 			uiType: "default",
 		};
+	}
+
+	getItem(uuid: string): ItemInstance | undefined {
+		return this.items.get(uuid);
+	}
+
+	getHotbarUUID(slot: number): string | undefined {
+		return this.hotbar[slot];
+	}
+
+	getStorageUUID(index: number): string {
+		return this.storage[index];
+	}
+
+	isEquipped(uuid: string): boolean {
+		return this.equippedItemUUID === uuid;
 	}
 }
