@@ -1,5 +1,5 @@
 import { HttpService } from "@rbxts/services";
 
-export default function Generate(): string {
+export default function generate(): string {
 	return HttpService.GenerateGUID(false);
 }
