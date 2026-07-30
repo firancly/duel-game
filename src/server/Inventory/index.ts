@@ -1,7 +1,9 @@
 import { Players } from "@rbxts/services";
 import { InventoryState } from "./Data/InventoryState";
 import { Operations } from "./Operations/Operations";
-import { DEFAULT_SKINS } from "shared/Catalog";
+import { DEFAULT_SKINS, getDef } from "shared/Catalog";
+import { Replicator } from "./Replication/replicator";
+import { Actions } from "./Replication/actions";
 
 const playerInventories = new Map<Player, InventoryState>();
 
@@ -53,6 +55,10 @@ export class InventoryService {
 		if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
 
 		const result = Operations.add(state, itemId);
+		if (result.success === true) {
+			Replicator.sendAdd(player, itemId, state.items.get(itemId)?.size() ?? 0);
+		}
+
 		return result;
 	}
 
@@ -61,7 +67,11 @@ export class InventoryService {
 	// 	const state = playerInventories.get(player);
 	// 	if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
 
-	// 	const result = Operation.remove(state, itemId);
+	// 	const result = Operations.remove(state, itemId);
+	// if (result.success === true) {
+	// 		const def = getDef(itemId);
+	// 		Replicator.sendRemove(player, itemId, 1);
+	// 	}
 	// 	return result;
 	// }
 
@@ -70,6 +80,10 @@ export class InventoryService {
 		if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
 
 		const result = Operations.equip(state, itemId);
+		if (result.success === true) {
+			const def = getDef(itemId)!;
+			Replicator.sendEquip(player, def.slot, itemId);
+		}
 
 		return result;
 	}
@@ -90,7 +104,14 @@ export class InventoryService {
 		}
 
 		// Setup remotes
-		// setupRemotes();
+		Replicator.onAskForInventory((player) => {
+			const state = playerInventories.get(player);
+			return state ? Actions.init(state) : undefined;
+		});
+
+		Replicator.onRequestEquip((player, id) => {
+			InventoryService.equipItem(player, id); // re-validates ownership, equips, pushes delta
+		});
 
 		print("[Inventory Service] Initialized");
 	}
