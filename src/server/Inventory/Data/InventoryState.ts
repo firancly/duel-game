@@ -1,22 +1,20 @@
-export interface ItemInstance {
-	UUID: string;
-	id: string;
-	amount: number;
-	metadata?: Map<string, unknown>;
-}
+import { WeaponSlot } from "shared/Catalog";
 
+export interface ItemInstance {
+	uuid: string; // unique id used for trading
+	serial?: number; // later
+	obtainedAt?: number; // later
+}
 export interface InventoryStateType {
 	player: Player;
-	items: Map<string, ItemInstance>;
-	itemsById: Map<string, string[]>;
-	equippedItemsUUID?: string[];
+	items: Map<string, ItemInstance[]>; // id -> ItemInstance
+	equipped: Map<WeaponSlot, string>; // slot -> equipped skin uuid
 }
 
 export class InventoryState implements InventoryStateType {
 	player: Player;
-	items = new Map<string, ItemInstance>();
-	itemsById = new Map<string, string[]>();
-	equippedItemsUUID?: string[] | undefined;
+	items = new Map<string, ItemInstance[]>();
+	equipped = new Map<WeaponSlot, string>(); // slot -> equipped skin uuid
 
 	died = false;
 
