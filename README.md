@@ -98,3 +98,7 @@ I built the whole thing bottom up and tested each layer with prints before wirin
 ## About the weight system (commit `778d051`)
 
 Early on I made a full survival/rpg inventory system: weight limits, stacking, hotbar and storage slots with gaps, dropping items on the ground, metadata parsing, all of it. Spent a good while on it. Then I rewrote it to a skin locker and it needs none of that. Skins have no weight, you never drop one in the world, there's no grid to manage. So I deleted the whole weight/stacking/slot layer and replaced it with the catalog + one skin per slot setup that's here now. `shared/Settings.ts` is the last scrap of that old version and it'll get removed. If you want to see that system go to commit `778d051`.
+
+
+## Video demo
+https://github.com/user-attachments/assets/a5237e4f-1cca-43d1-89da-853a3781ec80
