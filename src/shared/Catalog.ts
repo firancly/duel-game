@@ -2,11 +2,11 @@
 // Lives in shared: server validates/reads slot, client reads image/rarity for UI.
 // An ItemInstance only stores { UUID, id } — everything static is looked up here by id.
 //
-// Weapons are FIXED: every player always has a Sniper, Revolver, and Knife.
+// Weapons are FIXED: every player always has a Rifle, Revolver, and Knife.
 // You don't own or equip weapons — you own SKINS and pick one per weapon slot.
 
 export enum WeaponSlot {
-	Sniper = "Sniper",
+	Rifle = "Rifle",
 	Revolver = "Revolver",
 	Knife = "Knife",
 }
@@ -89,25 +89,25 @@ export const Catalog = new Map<string, SkinDef>([
 		},
 	],
 
-	// ── Sniper skins ────────────────────────────────────────────
+	// ── Rifel skins ────────────────────────────────────────────
 	[
 		"frost_scope",
 		{
 			id: "frost_scope",
 			name: "Frost Scope",
 			image: "rbxassetid://0000000006",
-			slot: WeaponSlot.Sniper,
+			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Rare,
 			tradeable: true,
 		},
 	],
 	[
-		"default_sniper",
+		"default_rifle",
 		{
-			id: "default_sniper",
-			name: "Default Sniper",
+			id: "default_rifle",
+			name: "Default Rifle",
 			image: "rbxassetid://0000000007",
-			slot: WeaponSlot.Sniper,
+			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Common,
 			tradeable: false,
 		},
@@ -115,7 +115,7 @@ export const Catalog = new Map<string, SkinDef>([
 ]);
 
 export const DEFAULT_SKINS = new Map<WeaponSlot, string>([
-	[WeaponSlot.Sniper, "default_sniper"],
+	[WeaponSlot.Rifle, "default_rifle"],
 	[WeaponSlot.Revolver, "default_revolver"],
 	[WeaponSlot.Knife, "default_knife"],
 ]);
