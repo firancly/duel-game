@@ -1,7 +1,9 @@
 import { Players } from "@rbxts/services";
-import { InventoryService } from "./Inventory";
+import * as InventoryService from "./Inventory";
+import * as TradeService from "./Trade/TradeService";
 
 InventoryService.init();
+TradeService.init();
 
 // Setup chat commands
 Players.PlayerAdded.Connect((player) => {

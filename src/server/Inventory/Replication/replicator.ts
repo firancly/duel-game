@@ -1,34 +1,16 @@
-import { ReplicatedStorage } from "@rbxts/services";
 import { Actions, InvAction } from "./actions";
 import { InventoryStateType } from "../Data/InventoryState";
 import { WeaponSlot } from "shared/Catalog";
-
-function getRemotesFolder(): Folder {
-	let folder = ReplicatedStorage.FindFirstChild("Remotes") as Folder | undefined;
-	if (folder === undefined) {
-		folder = new Instance("Folder");
-		folder.Name = "Remotes";
-		folder.Parent = ReplicatedStorage;
-	}
-	return folder;
-}
-
-const remotes = getRemotesFolder();
+import { remote } from "shared/Remotes";
 
 // server to client
-const inventoryUpdate = new Instance("RemoteEvent");
-inventoryUpdate.Name = "InventoryUpdate";
-inventoryUpdate.Parent = remotes;
+const inventoryUpdate = remote("InventoryUpdate", "RemoteEvent");
 
 // client to server
-const askForInventory = new Instance("RemoteFunction");
-askForInventory.Name = "AskForInventory";
-askForInventory.Parent = remotes;
+const askForInventory = remote("AskForInventory", "RemoteFunction");
 
 // client to server
-const requestEquip = new Instance("RemoteEvent");
-requestEquip.Name = "RequestEquip";
-requestEquip.Parent = remotes;
+const requestEquip = remote("RequestEquip", "RemoteEvent");
 
 // Send core
 export class Replicator {

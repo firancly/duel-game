@@ -23,14 +23,20 @@ function onPlayerAdded(player: Player) {
 
 	for (const [slot, id] of DEFAULT_SKINS) {
 		const result = Operations.add(state, id); // creates a real ItemInstance w/ uuid
-		if (result.changedItem) state.equipped.set(slot, result.changedItem.id);
+		if (result.success) state.equipped.set(slot, result.changedItem.id);
+
+		if (!result.success) {
+			warn(`DEFAULT_SKINS: failed to add ${id} reason: ${result.reason}`);
+			continue;
+		}
+		state.equipped.set(slot, result.changedItem.id);
 	}
 
 	player.CharacterAdded.Connect((character) => {
 		character.FindFirstChildWhichIsA("Humanoid")!.Died.Once(() => (state.died = true));
 
 		if (state.died) {
-			InventoryService.reloadClient(player);
+			reloadClient(player);
 
 			state.died = false;
 		}
@@ -39,80 +45,78 @@ function onPlayerAdded(player: Player) {
 	print("[InventoryService] Loaded inventory for:", player.Name);
 }
 
-function onPlayerRemoving(player: Player) {
+export function onPlayerRemoving(player: Player) {
 	playerInventories.delete(player);
 	playerOperationLock.delete(player);
 	print("[InventoryService] Unloaded inventory for:", player.Name);
 }
 
-export class InventoryService {
-	static getState(player: Player) {
-		return playerInventories.get(player);
+export function getState(player: Player) {
+	return playerInventories.get(player);
+}
+
+export function addItem(player: Player, itemId: string) {
+	const state = playerInventories.get(player);
+	if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
+
+	const result = Operations.add(state, itemId);
+	if (result.success === true) {
+		Replicator.sendAdd(player, itemId, state.items.get(itemId)?.size() ?? 0);
 	}
 
-	static addItem(player: Player, itemId: string) {
+	return result;
+}
+
+// TODO
+// export function removeItem(player: Player, itemId: string) {
+// 	const state = playerInventories.get(player);
+// 	if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
+
+// 	const result = Operations.remove(state, itemId);
+// if (result.success === true) {
+// 		const def = getDef(itemId);
+// 		Replicator.sendRemove(player, itemId, 1);
+// 	}
+// 	return result;
+// }
+
+export function equipItem(player: Player, itemId: string) {
+	const state = playerInventories.get(player);
+	if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
+
+	const result = Operations.equip(state, itemId);
+	if (result.success === true) {
+		const def = getDef(itemId)!;
+		Replicator.sendEquip(player, def.slot, itemId);
+	}
+
+	return result;
+}
+
+export function reloadClient(player: Player) {
+	const state = playerInventories.get(player);
+	if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
+
+	// Module helper class to communicate with the client
+}
+
+export function init() {
+	Players.PlayerAdded.Connect(onPlayerAdded);
+	Players.PlayerRemoving.Connect(onPlayerRemoving);
+
+	for (const player of Players.GetPlayers()) {
+		onPlayerAdded(player);
+	}
+
+	// Setup remotes
+	Replicator.onAskForInventory((player) => {
 		const state = playerInventories.get(player);
-		if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
+		return state ? Actions.init(state) : undefined;
+	});
 
-		const result = Operations.add(state, itemId);
-		if (result.success === true) {
-			Replicator.sendAdd(player, itemId, state.items.get(itemId)?.size() ?? 0);
-		}
+	Replicator.onRequestEquip((player, id) => {
+		equipItem(player, id); // re-validates ownership, equips, pushes delta
+	});
 
-		return result;
-	}
-
-	// TODO
-	// static removeItem(player: Player, itemId: string) {
-	// 	const state = playerInventories.get(player);
-	// 	if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
-
-	// 	const result = Operations.remove(state, itemId);
-	// if (result.success === true) {
-	// 		const def = getDef(itemId);
-	// 		Replicator.sendRemove(player, itemId, 1);
-	// 	}
-	// 	return result;
-	// }
-
-	static equipItem(player: Player, itemId: string) {
-		const state = playerInventories.get(player);
-		if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
-
-		const result = Operations.equip(state, itemId);
-		if (result.success === true) {
-			const def = getDef(itemId)!;
-			Replicator.sendEquip(player, def.slot, itemId);
-		}
-
-		return result;
-	}
-
-	static reloadClient(player: Player) {
-		const state = playerInventories.get(player);
-		if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
-
-		// Module helper class to communicate with the client
-	}
-
-	static init() {
-		Players.PlayerAdded.Connect(onPlayerAdded);
-		Players.PlayerRemoving.Connect(onPlayerRemoving);
-
-		for (const player of Players.GetPlayers()) {
-			onPlayerAdded(player);
-		}
-
-		// Setup remotes
-		Replicator.onAskForInventory((player) => {
-			const state = playerInventories.get(player);
-			return state ? Actions.init(state) : undefined;
-		});
-
-		Replicator.onRequestEquip((player, id) => {
-			InventoryService.equipItem(player, id); // re-validates ownership, equips, pushes delta
-		});
-
-		print("[Inventory Service] Initialized");
-	}
+	print("[Inventory Service] Initialized");
 }

@@ -2,14 +2,20 @@ import { getDef } from "shared/Catalog";
 import { InventoryStateType, ItemInstance } from "../Data/InventoryState";
 import generate from "../Utils/uuid";
 
-export interface OperationResult {
-	success: boolean;
-	reason?: string;
-	changedItem?: { id: string; uuid: string };
-}
+// export interface OperationResult {
+// 	success: boolean;
+// 	reason?: string;
+// 	changedItem?: { id: string; uuid: string };
+// }
+
+// Union type to make sure that if success is true, changedItem is present, and if success is false, reason is present. This makes it easier to handle the result of operations without having to check for undefined values.
+export type OperationResult =
+	{ success: true; changedItem: { id: string; uuid: string } } | { success: false; reason: string };
 
 function createItem(state: InventoryStateType, itemId: string): ItemInstance {
 	const uuid = generate();
+
+	// TODO add serial and obtainedAt to ItemInstance
 
 	const item: ItemInstance = {
 		uuid: uuid,
@@ -26,7 +32,6 @@ function createItem(state: InventoryStateType, itemId: string): ItemInstance {
 }
 
 export class Operations {
-	// Run when opening skin crates
 	static add(state: InventoryStateType, itemId: string): OperationResult {
 		const def = getDef(itemId);
 		if (def === undefined) return { success: false, reason: "NOT_IN_CATALOG" };
@@ -56,7 +61,6 @@ export class Operations {
 	// 	};
 	// }
 
-	// Equip/unequip in players inventory
 	static equip(state: InventoryStateType, itemId: string): OperationResult {
 		// const uuids = state.itemsById.get(itemId);
 		// if (uuids === undefined || uuids.size() === 0) return { success: false, reason: "NO_ITEM_IN_INVENTORY" };

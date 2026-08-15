@@ -1,4 +1,4 @@
-import { WeaponSlot } from "./Catalog";
+import { WeaponSlot } from "../Catalog";
 
 export interface InitPayload {
 	owned: { [id: string]: number };

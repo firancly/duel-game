@@ -1,7 +1,7 @@
 import { ReplicatedStorage } from "@rbxts/services";
 import { Store } from "./Store";
 import { WeaponSlot } from "shared/Catalog";
-import { AddRemovePayload, EquipPayload, InitPayload } from "shared/InventoryActions";
+import { AddRemovePayload, EquipPayload, InitPayload } from "shared/types/Inventory";
 import * as InventoryUI from "./InventoryUI";
 
 const remotes = ReplicatedStorage.WaitForChild("Remotes");
@@ -30,8 +30,3 @@ const snapshot = askForInventory.InvokeServer() as InitPayload;
 Store.init(snapshot);
 
 InventoryUI.init((id) => requestEquip.FireServer(id));
-
-// client
-task.wait(10);
-requestEquip.FireServer("seer"); // later: from a button click
-print("Requesting to equip seer");
