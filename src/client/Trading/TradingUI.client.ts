@@ -27,6 +27,9 @@ const remotes = ReplicatedStorage.WaitForChild("Remotes");
 const getTradePlayers = remotes.WaitForChild("GetTradePlayers") as RemoteFunction;
 const sendTradeRequest = remotes.WaitForChild("SendTradeRequest") as RemoteEvent;
 const incomingTradeRequest = remotes.WaitForChild("IncomingTradeRequest") as RemoteEvent;
+const tradeStarted = remotes.WaitForChild("TradeStarted") as RemoteEvent;
+
+const tradeSecond = mainFrame.WaitForChild("TradeSecondGUI") as ImageLabel;
 
 // ── helpers ───────────────────────────────────────────────────────
 function avatar(userId: number): string {
@@ -81,11 +84,31 @@ let tradeGuiVisible = false;
 	if (tradeGuiVisible) refresh(); // only re-fetch the player list on open
 });
 
-// ── someone wants to trade with us (the "another gui") ────────────
+// ── someone wants to trade with us ────────────────────────────────
+// TEMP for testing: accept by typing "accept" in chat (server reads it)
 incomingTradeRequest.OnClientEvent.Connect((fromUserId: number, fromName: string) => {
-	// NEXT PHASE: show an accept/decline popup with their name + avatar,
-	// then RespondTradeRequest → open TradeSecondGUI.
-	print(`[Trade] ${fromName} (id ${fromUserId}) wants to trade`);
+	print(`[Trade] ${fromName} wants to trade — type "accept" in chat to accept`);
+});
+
+// ── trade started → open the trade window on both sides ───────────
+tradeStarted.OnClientEvent.Connect((otherUserId: number, otherDisplayName: string) => {
+	tradeGui.Visible = false; // close the player list
+	tradeGuiVisible = false;
+
+	const up = tradeSecond.WaitForChild("UpParts");
+	const other = Players.GetPlayerByUserId(otherUserId);
+
+	// you (left side)
+	(up.WaitForChild("DisplayName") as TextLabel).Text = player.DisplayName;
+	(up.WaitForChild("Name") as TextLabel).Text = `@${player.Name}`;
+	(up.WaitForChild("YouIcon") as ImageLabel).Image = avatar(player.UserId);
+
+	// them (right side)
+	(up.WaitForChild("DisplayName2") as TextLabel).Text = otherDisplayName;
+	(up.WaitForChild("Name2") as TextLabel).Text = other ? `@${other.Name}` : "";
+	(up.WaitForChild("TheirIcon") as ImageLabel).Image = avatar(otherUserId);
+
+	tradeSecond.Visible = true;
 });
 
 export {};
