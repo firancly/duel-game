@@ -1,4 +1,4 @@
-import { getDef } from "shared/Catalog";
+import { getDef, DEFAULT_SKINS } from "shared/Catalog";
 import { InventoryStateType, ItemInstance } from "../Data/InventoryState";
 import generate from "../Utils/uuid";
 
@@ -75,6 +75,23 @@ export class Operations {
 		state.equipped.set(def.slot, itemId); // slot from catalog; set auto-replaces old skin
 		warn(`Added ${itemId} to ${def.slot}`);
 		return { success: true, changedItem: { id: itemId, uuid: items[0].uuid } };
+	}
+
+	// remove one copy of itemId if it was the last copy and equipped, revert to default
+	static removeOne(state: InventoryStateType, itemId: string): OperationResult {
+		const items = state.items.get(itemId);
+		if (items === undefined || items.size() === 0) return { success: false, reason: "NOT_OWNED" };
+
+		const removed = items.pop()!;
+		if (items.size() === 0) {
+			state.items.delete(itemId);
+			const def = getDef(itemId);
+			if (def !== undefined && state.equipped.get(def.slot) === itemId) {
+				const fallback = DEFAULT_SKINS.get(def.slot);
+				if (fallback !== undefined) state.equipped.set(def.slot, fallback);
+			}
+		}
+		return { success: true, changedItem: { id: itemId, uuid: removed.uuid } };
 	}
 
 	static unequip() {}

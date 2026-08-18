@@ -1,7 +1,7 @@
 import { Players } from "@rbxts/services";
 import { InventoryState } from "./Data/InventoryState";
 import { Operations } from "./Operations/Operations";
-import { DEFAULT_SKINS, getDef } from "shared/Catalog";
+import { Catalog, DEFAULT_SKINS, getDef } from "shared/Catalog";
 import { Replicator } from "./Replication/replicator";
 import { Actions } from "./Replication/actions";
 
@@ -30,6 +30,13 @@ function onPlayerAdded(player: Player) {
 			continue;
 		}
 		state.equipped.set(slot, result.changedItem.id);
+	}
+
+	// TEMP for testing: give one of every non-default skin in the catalog
+	const defaultIds = new Set<string>();
+	for (const [, id] of DEFAULT_SKINS) defaultIds.add(id);
+	for (const [id] of Catalog) {
+		if (!defaultIds.has(id)) Operations.add(state, id);
 	}
 
 	player.CharacterAdded.Connect((character) => {
@@ -67,18 +74,16 @@ export function addItem(player: Player, itemId: string) {
 	return result;
 }
 
-// TODO
-// export function removeItem(player: Player, itemId: string) {
-// 	const state = playerInventories.get(player);
-// 	if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
+export function removeItem(player: Player, itemId: string) {
+	const state = playerInventories.get(player);
+	if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
 
-// 	const result = Operations.remove(state, itemId);
-// if (result.success === true) {
-// 		const def = getDef(itemId);
-// 		Replicator.sendRemove(player, itemId, 1);
-// 	}
-// 	return result;
-// }
+	const result = Operations.removeOne(state, itemId);
+	if (result.success === true) {
+		Replicator.sendRemove(player, itemId, state.items.get(itemId)?.size() ?? 0);
+	}
+	return result;
+}
 
 export function equipItem(player: Player, itemId: string) {
 	const state = playerInventories.get(player);

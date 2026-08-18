@@ -1,7 +1,7 @@
 import { WeaponSlot } from "shared/Catalog";
 import { InventoryStateType, ItemInstance } from "../Data/InventoryState";
 
-// 1. The vocabulary — every message type the client can receive
+// 1. The vocabulary: every message type the client can receive
 export enum InvAction {
 	INIT = "Init", // full snapshot (on join)
 	ADD = "Add", // one skin added
@@ -10,8 +10,8 @@ export enum InvAction {
 	UNEQUIP = "Unequip", // a slot reverted to default
 }
 
-// 2. Helpers — turn server Maps into plain objects the wire can carry
-//    (Maps don't cross RemoteEvents cleanly — flatten to id->count / slot->id)
+// 2. Helpers: turn server Maps into plain objects the wire can carry
+//    (Maps don't cross RemoteEvents cleanly, so flatten to id->count / slot->id)
 function ownedToRecord(items: Map<string, ItemInstance[]>): { [id: string]: number } {
 	const out: { [id: string]: number } = {};
 	for (const [id, copies] of items) out[id] = copies.size(); // count only, no uuids
@@ -24,7 +24,7 @@ function equippedToRecord(equipped: Map<WeaponSlot, string>): { [slot: string]: 
 	return out;
 }
 
-// 3. The builders — each returns the payload shape for one message. No sending.
+// 3. The builders: each returns the payload shape for one message, no sending.
 export class Actions {
 	static init(state: InventoryStateType) {
 		return {

@@ -1,9 +1,11 @@
 import { Players } from "@rbxts/services";
 import * as InventoryService from "./Inventory";
 import * as TradeService from "./Trade/TradeService";
+import * as CurrencyService from "./Currency";
 
 InventoryService.init();
 TradeService.init();
+CurrencyService.init();
 
 // Setup chat commands
 Players.PlayerAdded.Connect((player) => {
@@ -28,6 +30,18 @@ Players.PlayerAdded.Connect((player) => {
 		if (keyword === "equip" && itemId !== "") {
 			InventoryService.equipItem(player, itemId);
 			print(`equipped ${itemId}`);
+		}
+
+		if (msg === "coins") print("coins:", CurrencyService.getBalance(player));
+
+		if (keyword === "earn" && itemId !== "") {
+			const n = tonumber(itemId);
+			if (n !== undefined) CurrencyService.earn(player, n);
+		}
+
+		if (keyword === "spend" && itemId !== "") {
+			const n = tonumber(itemId);
+			if (n !== undefined) CurrencyService.spend(player, n);
 		}
 
 		if (keyword === "unequip" && itemId !== "") {

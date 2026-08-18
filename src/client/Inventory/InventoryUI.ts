@@ -2,28 +2,47 @@ import { Players } from "@rbxts/services";
 import { getDef, WeaponSlot } from "shared/Catalog";
 import { Store } from "./Store";
 
+const EQUIPPED_IMAGE = "rbxassetid://126931322651156";
+const UNEQUIPPED_IMAGE = "rbxassetid://100260658216025";
+
+const ACTIVE_TAB = "rbxassetid://92004645740900";
+const INACTIVE_TAB = "rbxassetid://118371499551965";
+
 // reference
 const gui = Players.LocalPlayer.WaitForChild("PlayerGui").WaitForChild("MainScreen");
-const invGui = gui.WaitForChild("MainFrame").WaitForChild("InventoryGUI");
+const invGui = gui.WaitForChild("MainFrame").WaitForChild("InventoryGUI") as ImageLabel;
 const scroll = invGui.WaitForChild("InventoryScroll") as ScrollingFrame;
-const template = scroll.WaitForChild("Template") as ImageLabel;
 const tabs = invGui.WaitForChild("ContainerButtons");
 
+const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"];
+const templates = new Map<string, ImageLabel>();
+for (const name of RARITY_NAMES) {
+	const t = scroll.FindFirstChild(name) as ImageLabel | undefined;
+	if (t !== undefined) {
+		t.Visible = false; // keep templates hidden
+		templates.set(name, t);
+	}
+}
+
 // state
-let currentSlots: WeaponSlot[] = [WeaponSlot.Rifle]; // active tab's slots
+let currentSlots: WeaponSlot[] = [WeaponSlot.Rifle]; // active tab slots
 let fireEquip: (id: string) => void = () => {}; // set in init()
 
 // redraw grid
 function render() {
-	// clear old cards (keep the hidden template)
+	// clear old cards keep the rarity templates
 	for (const child of scroll.GetChildren()) {
-		if (child.IsA("ImageLabel") && child.Name !== "Template") child.Destroy();
+		if (child.IsA("ImageLabel") && !templates.has(child.Name)) child.Destroy();
 	}
 
 	for (const [id, count] of Store.owned) {
 		const def = getDef(id);
 		if (def === undefined) continue;
 		if (!currentSlots.includes(def.slot)) continue; // filter by active tab
+
+		// choose the box for this skin's rarity
+		const template = templates.get(def.rarity);
+		if (template === undefined) continue;
 
 		const card = template.Clone();
 		card.Name = id;
@@ -40,26 +59,59 @@ function render() {
 
 		const isEquipped = Store.equipped.get(def.slot) === id;
 		btnText.Text = isEquipped ? "EQUIPPED" : "EQUIP";
+		btn.Image = isEquipped ? EQUIPPED_IMAGE : UNEQUIPPED_IMAGE;
+		btnText.FontFace = new Font("Roboto", Enum.FontWeight.Bold, Enum.FontStyle.Normal);
 
 		btn.Activated.Connect(() => fireEquip(id));
 	}
 }
 
 // tab switching
-function setTab(slots: WeaponSlot[]) {
+const tabButtons: ImageButton[] = [];
+
+function highlightTab(active: ImageButton) {
+	for (const b of tabButtons) b.Image = b === active ? ACTIVE_TAB : INACTIVE_TAB;
+}
+
+function setTab(slots: WeaponSlot[], button: ImageButton) {
 	currentSlots = slots;
+	highlightTab(button);
 	render();
 }
 
-// init: wire tabs + subscribe
+function wireTab(name: string, slots: WeaponSlot[]): ImageButton | undefined {
+	const btn = tabs.FindFirstChild(name) as ImageButton | undefined;
+	if (btn === undefined) return undefined;
+	tabButtons.push(btn);
+	btn.Activated.Connect(() => setTab(slots, btn));
+	return btn;
+}
+
+// wire tabs + subscribe
 export function init(requestEquip: (id: string) => void) {
 	fireEquip = requestEquip;
 
-	(tabs.WaitForChild("RifleButton") as ImageButton).Activated.Connect(() => setTab([WeaponSlot.Rifle]));
-	(tabs.WaitForChild("KnifeButton") as ImageButton).Activated.Connect(() => setTab([WeaponSlot.Knife]));
-	(tabs.WaitForChild("GunButton") as ImageButton).Activated.Connect(() => setTab([WeaponSlot.Revolver]));
-	// OtherButton wire when those slots exist
+	wireTab("KnifeButton", [WeaponSlot.Knife]);
+	const rifleBtn = wireTab("RifleButton", [WeaponSlot.Rifle]);
+	wireTab("GunButton", [WeaponSlot.Revolver]);
+	// OtherButton wire when that slot exists
 
-	Store.subscribe(render); // re render on every delta
+	if (rifleBtn !== undefined) highlightTab(rifleBtn); // Rifle is the default tab
+
+	Store.subscribe(render); // re-render on every delta
 	render(); // first draw
 }
+
+// Logic to open/close the inventory GUI
+const inventoryBtn = gui.WaitForChild("MainFrame").WaitForChild("Menu").WaitForChild("Inventory") as ImageButton;
+let inventoryGuiVisible = false;
+inventoryBtn.MouseButton1Click.Connect(() => {
+	inventoryGuiVisible = !inventoryGuiVisible;
+	invGui.Visible = inventoryGuiVisible;
+});
+
+// Logic for close button
+const closeBtn = invGui.WaitForChild("CloseButton") as GuiButton;
+closeBtn.MouseButton1Click.Connect(() => {
+	(closeBtn.Parent as GuiObject).Visible = false;
+});

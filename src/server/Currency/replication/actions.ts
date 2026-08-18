@@ -1,23 +1,28 @@
+import { WalletStateType } from "../core/CurrencyState";
+
+// message types the client can receive
 export enum ActionType {
-	INIT = "Init",
-	EARN = "Earn",
-	SPEND = "Spend",
-	SET = "Set",
+	INIT = "Init", // full snapshot (on join)
+	EARN = "Earn", // coins gained
+	SPEND = "Spend", // coins spent
+	SET = "Set", // balance overwritten (admin/debug)
 }
 
-export interface WalletStateType {
-	player: Player;
-	amount: number;
-}
-
+// every message carries `amount` = the new balance, so the client just displays it
 export class CoinActions {
 	static init(state: WalletStateType) {
-		return {
-			amount: state.amount,
-		};
+		return { amount: state.amount };
 	}
 
-	static earn() {}
-	static spend() {}
-	static set() {}
+	static earn(amount: number) {
+		return { amount };
+	}
+
+	static spend(amount: number) {
+		return { amount };
+	}
+
+	static set(amount: number) {
+		return { amount };
+	}
 }

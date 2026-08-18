@@ -1,9 +1,9 @@
 // Static definitions for every skin that can exist in the game.
 // Lives in shared: server validates/reads slot, client reads image/rarity for UI.
-// An ItemInstance only stores { UUID, id } — everything static is looked up here by id.
+// An ItemInstance only stores { UUID, id }, everything static is looked up here by id.
 //
 // Weapons are FIXED: every player always has a Rifle, Revolver, and Knife.
-// You don't own or equip weapons — you own SKINS and pick one per weapon slot.
+// You don't own or equip weapons, you own SKINS and pick one per weapon slot.
 
 export enum WeaponSlot {
 	Rifle = "Rifle",
@@ -30,13 +30,13 @@ export interface SkinDef {
 
 // id -> definition. Add every new skin here.
 export const Catalog = new Map<string, SkinDef>([
-	// ── Knife skins ─────────────────────────────────────────────
+	// Knife skins
 	[
 		"default_knife",
 		{
 			id: "default_knife",
 			name: "Default Knife",
-			image: "rbxassetid://0000000003",
+			image: "rbxassetid://7137398850",
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Common,
 			tradeable: false,
@@ -47,7 +47,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "seer",
 			name: "Seer",
-			image: "rbxassetid://0000000001",
+			image: "rbxassetid://4645047271",
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Mythic,
 			tradeable: true,
@@ -58,20 +58,20 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "tides",
 			name: "Tides",
-			image: "rbxassetid://0000000002",
+			image: "rbxassetid://8029980909",
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Rare,
 			tradeable: true,
 		},
 	],
 
-	// ── Revolver skins ──────────────────────────────────────────
+	// Revolver skins
 	[
 		"default_revolver",
 		{
 			id: "default_revolver",
 			name: "Default Revolver",
-			image: "rbxassetid://0000000005",
+			image: "rbxassetid://46392751",
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Common,
 			tradeable: false,
@@ -82,20 +82,20 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "heat",
 			name: "Heat",
-			image: "rbxassetid://0000000004",
+			image: "rbxassetid://46392751",
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Legendary,
 			tradeable: true,
 		},
 	],
 
-	// ── Rifel skins ────────────────────────────────────────────
+	// Rifel skins
 	[
 		"frost_scope",
 		{
 			id: "frost_scope",
 			name: "Frost Scope",
-			image: "rbxassetid://0000000006",
+			image: "rbxassetid://1246570249",
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Rare,
 			tradeable: true,
@@ -106,7 +106,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "default_rifle",
 			name: "Default Rifle",
-			image: "rbxassetid://0000000007",
+			image: "rbxassetid://1246570249",
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Common,
 			tradeable: false,
