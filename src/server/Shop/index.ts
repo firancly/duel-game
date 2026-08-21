@@ -3,9 +3,10 @@ import { Cases } from "shared/Cases";
 import { Catalog, getDef, Rarity } from "shared/Catalog";
 import * as CurrencyService from "server/Currency";
 import * as InventoryService from "server/Inventory";
+import { CaseResultPayload } from "shared/types/Shop";
 
 const openCase = remote("OpenCase", "RemoteEvent"); // C->S: caseId
-const caseResult = remote("CaseResult", "RemoteEvent"); // S->C: message text
+const caseResult = remote("CaseResult", "RemoteEvent"); // S->C: message text + CaseResultPayload
 
 // weighted random rarity
 function rollRarity(weights: { [rarity: string]: number }): string {
@@ -38,7 +39,8 @@ function handleOpen(player: Player, caseId: string) {
 	// take the money first (server-authoritative; fails if broke)
 	const spent = CurrencyService.spend(player, def.price);
 	if (!spent.success) {
-		caseResult.FireClient(player, `Not enough coins for ${def.name}.`);
+		const payload: CaseResultPayload = { ok: false, caseId };
+		caseResult.FireClient(player, `Not enough coins for ${def.name}.`, payload);
 		return;
 	}
 
@@ -46,13 +48,16 @@ function handleOpen(player: Player, caseId: string) {
 	const skinId = randomSkinOfRarity(rarity);
 	if (skinId === undefined) {
 		CurrencyService.earn(player, def.price); // refund — no skin of that rarity exists
-		caseResult.FireClient(player, `No ${rarity} skin available — refunded.`);
+		const payload: CaseResultPayload = { ok: false, caseId };
+		caseResult.FireClient(player, `No ${rarity} skin available — refunded.`, payload);
 		return;
 	}
 
 	InventoryService.addItem(player, skinId);
 	const skinDef = getDef(skinId)!;
-	caseResult.FireClient(player, `You unboxed ${skinDef.name} [${skinDef.rarity}] from the ${def.name}!`);
+	// The client holds this until the player has clicked the crate open.
+	const payload: CaseResultPayload = { ok: true, caseId, skinId, rarity };
+	caseResult.FireClient(player, `You unboxed ${skinDef.name} [${skinDef.rarity}] from the ${def.name}!`, payload);
 	print(`[Shop] ${player.Name} opened ${def.name} → ${skinId} (${rarity})`);
 }
 

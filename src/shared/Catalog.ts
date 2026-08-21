@@ -19,6 +19,16 @@ export enum Rarity {
 	Mythic = "Mythic",
 }
 
+// Rarity -> colour, used by the crate reveal (light + billboard stroke).
+// Lives here so any future UI colours rarity the same way.
+export const RarityColor = new Map<Rarity, Color3>([
+	[Rarity.Common, Color3.fromRGB(180, 185, 195)],
+	[Rarity.Rare, Color3.fromRGB(70, 145, 255)],
+	[Rarity.Epic, Color3.fromRGB(170, 85, 255)],
+	[Rarity.Legendary, Color3.fromRGB(255, 165, 40)],
+	[Rarity.Mythic, Color3.fromRGB(255, 65, 65)],
+]);
+
 export interface SkinDef {
 	id: string; // unique key, matches ItemInstance.id
 	name: string; // display name
