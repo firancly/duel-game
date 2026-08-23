@@ -22,7 +22,7 @@ export const Cases = new Map<string, CaseDef>([
 		{
 			id: "GreenCase",
 			name: "Green Case",
-			price: 50,
+			price: 300,
 			weights: { [Rarity.Common]: 70, [Rarity.Rare]: 25, [Rarity.Epic]: 5 },
 			color: Color3.fromRGB(70, 175, 90),
 			modelName: "BaseCrate",
@@ -33,21 +33,10 @@ export const Cases = new Map<string, CaseDef>([
 		{
 			id: "BlueCase",
 			name: "Blue Case",
-			price: 120,
+			price: 600,
 			weights: { [Rarity.Common]: 40, [Rarity.Rare]: 40, [Rarity.Epic]: 15, [Rarity.Legendary]: 5 },
 			color: Color3.fromRGB(60, 130, 235),
-			modelName: "RareCrate",
-		},
-	],
-	[
-		"RedCase",
-		{
-			id: "RedCase",
-			name: "Red Case",
-			price: 250,
-			weights: { [Rarity.Rare]: 35, [Rarity.Epic]: 40, [Rarity.Legendary]: 22, [Rarity.Mythic]: 3 },
-			color: Color3.fromRGB(215, 60, 60),
-			modelName: "EpicCrate",
+			modelName: "BlueCase",
 		},
 	],
 	[
@@ -55,10 +44,10 @@ export const Cases = new Map<string, CaseDef>([
 		{
 			id: "PurpleCase",
 			name: "Purple Case",
-			price: 500,
+			price: 1000,
 			weights: { [Rarity.Epic]: 45, [Rarity.Legendary]: 40, [Rarity.Mythic]: 15 },
 			color: Color3.fromRGB(150, 75, 220),
-			modelName: "LegendaryCrate",
+			modelName: "PurpleCase",
 		},
 	],
 	[
@@ -66,10 +55,21 @@ export const Cases = new Map<string, CaseDef>([
 		{
 			id: "YellowCase",
 			name: "Yellow Case",
-			price: 1000,
+			price: 1750,
 			weights: { [Rarity.Legendary]: 60, [Rarity.Mythic]: 40 },
 			color: Color3.fromRGB(240, 195, 55),
-			modelName: "MythicCrate",
+			modelName: "YellowCase",
+		},
+	],
+	[
+		"RedCase",
+		{
+			id: "RedCase",
+			name: "Red Case",
+			price: 3500,
+			weights: { [Rarity.Rare]: 35, [Rarity.Epic]: 40, [Rarity.Legendary]: 22, [Rarity.Mythic]: 3 },
+			color: Color3.fromRGB(215, 60, 60),
+			modelName: "RedCase",
 		},
 	],
 ]);
