@@ -1,30 +1,25 @@
-// Builds the 3D crate the player clicks open. Client-only, purely cosmetic.
-//
-// Asset lookup walks SEARCH_ROOTS under ReplicatedStorage (Assets/Cases first)
-// looking for a child named after the case — `modelName`, the id, or the display
-// name with or without spaces, case-insensitive. Models, single MeshParts and
-// folders of parts all work. If nothing matches, a crate is built out of Parts
-// so the feature still runs.
-//
-// What a Studio model needs (everything else is figured out or normalized here):
-//   - a child BasePart named "Lid" — this is the piece that pops off
-// PrimaryPart is optional: without one the biggest non-lid part becomes the body.
-// Existing ParticleEmitters in the model are reused instead of adding sparkles.
-
-import { ReplicatedStorage } from "@rbxts/services";
+import { KeyframeSequenceProvider, ReplicatedStorage } from "@rbxts/services";
 import { CaseDef } from "shared/Cases";
 
 const SPARKLE = "rbxasset://textures/particles/sparkles_main.dds";
 
+// The marker that means "the crate is open" cues the reward reveal. Particle
+// timing does NOT come from markers; it's the timeline in shared/CrateVFX.ts.
+export const OPEN_MARKER = "Crate";
+
 export interface Crate {
 	model: Model;
-	root: BasePart; // PrimaryPart, the crate body
-	lid: BasePart;
-	lidRest: CFrame; // lid CFrame in root's object space, at rest
+	root: BasePart; // anchored; everything else hangs off it
+	radius: number; // largest extent, drives staging distance
+	centerOffset: Vector3; // bounding-box centre in root space, so spin stays centred
 	light: PointLight;
-	burst: ParticleEmitter[];
-	centerOffset: Vector3; // bounding-box centre in pivot space, so spin stays centred
-	radius: number; // largest extent, drives how far the camera pulls back
+	burst: ParticleEmitter[]; // generic burst emitters (static crates)
+	rigged: boolean;
+	track?: AnimationTrack; // rigged crates only
+	effects: Map<string, ParticleEmitter[]>; // effect part name (lowercased) -> its emitters
+	display: CFrame; // authored orientation correction, see displayOffset()
+	lid?: BasePart; // static crates only
+	lidRest?: CFrame;
 }
 
 // Folders we'll look inside, in order. First hit wins.
@@ -56,11 +51,11 @@ function matches(inst: Instance, names: string[]): boolean {
 	return false;
 }
 
-// Names we accept for a case: the explicit override, the id, and the display
-// name with/without spaces — so "Green Case" in Studio still matches "GreenCase".
+// Names we accept for a case. The id goes first so a model named after the case
+// ("GreenCase") wins over a legacy `modelName` alias ("BaseCrate").
 function aliases(def: CaseDef): string[] {
 	const names = [def.id, def.name, def.name.gsub(" ", "")[0] as string];
-	if (def.modelName !== undefined) names.unshift(def.modelName);
+	if (def.modelName !== undefined) names.push(def.modelName);
 	return names;
 }
 
@@ -87,7 +82,7 @@ function findAsset(def: CaseDef): Instance | undefined {
 
 	warn(
 		`[Crate] no asset found for "${def.id}" (tried names: ${names.join(", ")}) — ` +
-			`put a Model named "${def.id}" in ReplicatedStorage/Assets/Cases. Using the procedural crate.`,
+			`put a Model named "${def.id}" in ReplicatedStorage/Assets/Cases.`,
 	);
 	return undefined;
 }
@@ -111,63 +106,47 @@ function asModel(source: Instance, name: string): Model {
 	return model;
 }
 
-function part(name: string, size: Vector3, cf: CFrame, color: Color3, parent: Instance): Part {
-	const p = new Instance("Part");
-	p.Name = name;
-	p.Size = size;
-	p.CFrame = cf;
-	p.Color = color;
-	p.Material = Enum.Material.SmoothPlastic;
-	p.Anchored = true;
-	p.CanCollide = false;
-	p.CanQuery = true;
-	p.TopSurface = Enum.SurfaceType.Smooth;
-	p.BottomSurface = Enum.SurfaceType.Smooth;
-	p.Parent = parent;
-	return p;
-}
-
-// Fallback crate: body + lid + trim, tinted by the case colour.
-function buildProcedural(def: CaseDef): Model {
-	const color = def.color ?? Color3.fromRGB(150, 150, 155);
-	const dark = color.Lerp(new Color3(0, 0, 0), 0.55);
-	const light = color.Lerp(new Color3(1, 1, 1), 0.35);
-
-	const model = new Instance("Model");
-	model.Name = def.id;
-
-	// Body sits with its centre on the origin; the lid rides on top.
-	const body = part("Body", new Vector3(4, 2.6, 4), new CFrame(0, 0, 0), color, model);
-	body.Material = Enum.Material.Metal;
-	body.Reflectance = 0.05;
-
-	part("Trim", new Vector3(4.1, 0.35, 4.1), new CFrame(0, 0.4, 0), dark, model);
-	part("Latch", new Vector3(0.6, 0.9, 0.25), new CFrame(0, 1.1, -2.05), light, model);
-
-	const lid = part("Lid", new Vector3(4.2, 0.7, 4.2), new CFrame(0, 1.65, 0), dark, model);
-	lid.Material = Enum.Material.Metal;
-	lid.Reflectance = 0.08;
-
-	model.PrimaryPart = body;
-	return model;
-}
-
-// Anchor everything, kill collisions, keep parts raycastable for the click test.
-function normalize(model: Model) {
+// Every part a Motor6D drives — these are the ones the animation moves, and the
+// only ones that may stay unanchored (they hang off the anchored root).
+function rigParts(model: Model): Set<BasePart> {
+	const driven = new Set<BasePart>();
 	for (const d of model.GetDescendants()) {
-		if (d.IsA("BasePart")) {
-			d.Anchored = true;
-			d.CanCollide = false;
-			d.CanQuery = true;
-			d.CanTouch = false;
-		}
+		if (!d.IsA("Motor6D")) continue;
+		if (d.Part0 !== undefined) driven.add(d.Part0);
+		if (d.Part1 !== undefined) driven.add(d.Part1);
 	}
+	return driven;
 }
 
-// The body is whichever part is biggest — never the lid, since the lid is the
-// piece that flies off. Studio models usually ship with no PrimaryPart set.
+// A rigged crate must keep its Motor6D chain free to move, so only the root is
+// anchored. Loose parts (VFX emitters in the effects folder) are NOT joined to
+// the rig, so they stay anchored or they'd simply fall. Static crates anchor
+// everything, since code moves those parts directly.
+function normalize(model: Model, root: BasePart, rigged: boolean) {
+	const driven = rigged ? rigParts(model) : new Set<BasePart>();
+
+	for (const d of model.GetDescendants()) {
+		if (!d.IsA("BasePart")) continue;
+
+		const animated = rigged && d !== root && driven.has(d);
+		d.Anchored = !animated;
+		d.CanCollide = false;
+		d.CanTouch = false;
+		d.CanQuery = true; // the click test raycasts against these
+		if (animated) d.Massless = true;
+	}
+	root.Anchored = true;
+}
+
+// Prefer an explicit PrimaryPart, then the rig root the animation is authored
+// against, then the biggest part that isn't the lid (the lid flies off).
 function pickRoot(model: Model): BasePart | undefined {
 	if (model.PrimaryPart !== undefined) return model.PrimaryPart;
+
+	for (const name of ["RootPart", "HumanoidRootPart"]) {
+		const named = model.FindFirstChild(name);
+		if (named !== undefined && named.IsA("BasePart")) return named;
+	}
 
 	let best: BasePart | undefined;
 	let fallback: BasePart | undefined;
@@ -194,12 +173,43 @@ function pickLid(model: Model, root: BasePart): BasePart {
 	return best ?? root;
 }
 
-// Reuse whatever emitters the model already ships with (the "Particles"
-// attachment on the real crates). Only if there are none do we add sparkles.
-function collectEmitters(model: Model, lid: BasePart, def: CaseDef): ParticleEmitter[] {
+// Group the emitters sitting in the model's effect folder (e.g. "Green") by the
+// part that holds them, and switch them off — markers turn them on later.
+function gatherEffects(model: Model): Map<string, ParticleEmitter[]> {
+	const groups = new Map<string, ParticleEmitter[]>();
+
+	for (const child of model.GetChildren()) {
+		if (!child.IsA("Folder")) continue;
+		for (const effectPart of child.GetChildren()) {
+			const emitters: ParticleEmitter[] = [];
+			for (const d of effectPart.GetDescendants()) {
+				if (d.IsA("ParticleEmitter")) {
+					d.Enabled = false;
+					emitters.push(d);
+				}
+			}
+			if (emitters.size() > 0) groups.set(effectPart.Name.lower(), emitters);
+		}
+	}
+	return groups;
+}
+
+// Anything not already claimed as a marker effect, used for click feedback on
+// static crates. If the model ships no emitters at all, add sparkles.
+function collectEmitters(
+	model: Model,
+	lid: BasePart,
+	def: CaseDef,
+	claimed: Map<string, ParticleEmitter[]>,
+): ParticleEmitter[] {
+	const taken = new Set<ParticleEmitter>();
+	for (const [, emitters] of claimed) for (const e of emitters) taken.add(e);
+
 	const found: ParticleEmitter[] = [];
-	for (const d of model.GetDescendants()) if (d.IsA("ParticleEmitter")) found.push(d);
-	if (found.size() > 0) return found;
+	for (const d of model.GetDescendants()) {
+		if (d.IsA("ParticleEmitter") && !taken.has(d)) found.push(d);
+	}
+	if (found.size() > 0 || claimed.size() > 0) return found;
 
 	const attach = new Instance("Attachment");
 	attach.Parent = lid;
@@ -217,12 +227,154 @@ function collectEmitters(model: Model, lid: BasePart, def: CaseDef): ParticleEmi
 	return [burst];
 }
 
+// AnimSaves often holds more than one take — the real animation plus the
+// editor's "Automatic Save" scratch copy. Prefer an explicitly named take, then
+// anything that isn't the autosave, and only use the autosave as a last resort.
+function pickSequence(model: Model, def: CaseDef): KeyframeSequence | undefined {
+	const found: KeyframeSequence[] = [];
+	for (const d of model.GetDescendants()) if (d.IsA("KeyframeSequence")) found.push(d);
+	if (found.size() === 0) return undefined;
+
+	if (def.animationName !== undefined) {
+		for (const s of found) if (s.Name.lower() === def.animationName.lower()) return s;
+		warn(`[Crate] ${def.id}: no take named "${def.animationName}" in AnimSaves`);
+	}
+
+	for (const s of found) if (s.Name.lower() !== "automatic save") return s;
+	return found[0];
+}
+
+// config id -> a shipped Animation instance -> registering the raw KeyframeSequence.
+function resolveAnimationId(model: Model, def: CaseDef): string | undefined {
+	if (def.animationId !== undefined && def.animationId !== "") return def.animationId;
+
+	const existing = model.FindFirstChildWhichIsA("Animation", true);
+	if (existing !== undefined && existing.AnimationId !== "") return existing.AnimationId;
+
+	const sequence = pickSequence(model, def);
+	if (sequence === undefined) return undefined;
+
+	// Registering an AnimSaves KeyframeSequence gives a local-only "hash://" id.
+	// Handy in Studio, but publish the animation and set CaseDef.animationId for
+	// anything shipping — this call is not guaranteed outside Studio.
+	const found = sequence;
+	const [ok, id] = pcall(() => KeyframeSequenceProvider.RegisterKeyframeSequence(found));
+	if (!ok) {
+		warn(`[Crate] could not register KeyframeSequence for ${def.id} — publish it and set animationId.`);
+		return undefined;
+	}
+	return id as string;
+}
+
+// An animated prop can be rigged either way: Humanoid > Animator (what the
+// animation editor gives you by default) or AnimationController > Animator
+// (leaner, and the better choice for something that isn't a character).
+function findAnimator(model: Model): Animator | undefined {
+	const holder =
+		model.FindFirstChildOfClass("AnimationController") ??
+		(model.FindFirstChildOfClass("Humanoid") as Instance | undefined);
+	return holder?.FindFirstChildOfClass("Animator");
+}
+
+function attrNumber(inst: Instance | undefined, name: string): number | undefined {
+	if (inst === undefined) return undefined;
+	const value = inst.GetAttribute(name);
+	return typeIs(value, "number") ? value : undefined;
+}
+
+/**
+ * How the crate has to be turned to face the player, in degrees.
+ *
+ * The presenter overwrites the root's CFrame every frame to stage and spin the
+ * crate, so rotating RootPart in Studio has no effect at runtime — that edit is
+ * simply overwritten. Set it here instead. In order of precedence:
+ *
+ *   1. a DisplayYaw / DisplayPitch / DisplayRoll attribute on the Model or its root
+ *   2. CaseDef.displayYaw in shared/Cases.ts
+ *
+ * Attributes are the quick path: select the crate Model in Studio, add a number
+ * attribute "DisplayYaw", and try 90 / 180 / 270 until it faces front. It sticks
+ * because this reads it, unlike the RootPart's own orientation.
+ */
+function displayOffset(model: Model, root: BasePart, def: CaseDef): CFrame {
+	const yaw = attrNumber(model, "DisplayYaw") ?? attrNumber(root, "DisplayYaw") ?? def.displayYaw ?? 0;
+	const pitch = attrNumber(model, "DisplayPitch") ?? attrNumber(root, "DisplayPitch") ?? 0;
+	const roll = attrNumber(model, "DisplayRoll") ?? attrNumber(root, "DisplayRoll") ?? 0;
+
+	return CFrame.Angles(math.rad(pitch), math.rad(yaw), math.rad(roll));
+}
+
+// Measure the crate body only. VFX parts (ray planes, flares) live in the
+// effects folder and are often tens of studs wide — letting them into the
+// bounding box throws the staging distance out and pushes the crate off-screen.
+function measure(model: Model, root: BasePart): { center: Vector3; radius: number } {
+	let min: Vector3 | undefined;
+	let max: Vector3 | undefined;
+
+	for (const d of model.GetDescendants()) {
+		if (!d.IsA("BasePart")) continue;
+		if (d.FindFirstAncestorOfClass("Folder") !== undefined) continue; // effects folder
+		if (d.Transparency >= 1) continue; // invisible rig roots
+
+		const half = d.Size.mul(0.5);
+		const lo = d.Position.sub(half);
+		const hi = d.Position.add(half);
+		min = min === undefined ? lo : min.Min(lo);
+		max = max === undefined ? hi : max.Max(hi);
+	}
+
+	if (min === undefined || max === undefined) {
+		return { center: root.Position, radius: math.max(1, root.Size.Magnitude) };
+	}
+
+	const size = max.sub(min);
+	return { center: min.add(size.mul(0.5)), radius: math.max(1, math.max(size.X, size.Y, size.Z)) };
+}
+
+/**
+ * Load the opening animation. Must be called AFTER the model is parented into
+ * the world — Animator:LoadAnimation fails on a rig that isn't in the DataModel,
+ * which silently drops the crate back to the coded open.
+ */
+export function bindAnimation(crate: Crate, def: CaseDef): AnimationTrack | undefined {
+	if (!crate.rigged) return undefined;
+
+	const animator = findAnimator(crate.model);
+	if (animator === undefined) return undefined;
+
+	crate.track = loadTrack(crate.model, animator, def);
+	return crate.track;
+}
+
+function loadTrack(model: Model, animator: Animator, def: CaseDef): AnimationTrack | undefined {
+	const id = resolveAnimationId(model, def);
+	if (id === undefined) {
+		warn(`[Crate] ${def.id} is rigged but has no animation — falling back to the coded open.`);
+		return undefined;
+	}
+
+	const animation = new Instance("Animation");
+	animation.AnimationId = id;
+	animation.Parent = model;
+
+	const [ok, track] = pcall(() => animator.LoadAnimation(animation));
+	if (!ok) {
+		warn(`[Crate] failed to load animation ${id} for ${def.id}`);
+		return undefined;
+	}
+
+	const loaded = track as AnimationTrack;
+	loaded.Looped = false;
+	loaded.Priority = Enum.AnimationPriority.Action;
+	return loaded;
+}
+
 export function build(def: CaseDef): Crate | undefined {
 	const asset = findAsset(def);
-	const model = asset !== undefined ? asModel(asset, def.id) : buildProcedural(def);
-	if (asset !== undefined) print(`[Crate] ${def.id} → ${asset.GetFullName()}`);
+	if (asset === undefined) return undefined; // no fallback — caller reports the error
 
-	normalize(model);
+	const model = asModel(asset, def.id);
+	print(`[Crate] ${def.id} → ${asset.GetFullName()}`);
 
 	const root = pickRoot(model);
 	if (root === undefined) {
@@ -230,9 +382,21 @@ export function build(def: CaseDef): Crate | undefined {
 		model.Destroy();
 		return undefined;
 	}
+
+	// Rigged is decided by the rig itself, not by whether the animation loaded —
+	// the track is bound later, once the model is in the world.
+	const rigged = findAnimator(model) !== undefined && rigParts(model).size() > 0;
+
+	// A prop humanoid has no business running the state machine. Crates rigged
+	// with an AnimationController have nothing to switch off.
+	const humanoid = model.FindFirstChildOfClass("Humanoid");
+	if (humanoid !== undefined) humanoid.EvaluateStateMachine = false;
+
+	normalize(model, root, rigged);
 	model.PrimaryPart = root;
 
-	const lid = pickLid(model, root);
+	const effects = gatherEffects(model);
+	const lid = rigged ? undefined : pickLid(model, root);
 
 	// Reveal light lives in the body, off until the crate opens.
 	const light = new Instance("PointLight");
@@ -241,22 +405,27 @@ export function build(def: CaseDef): Crate | undefined {
 	light.Color = def.color ?? new Color3(1, 1, 1);
 	light.Parent = root;
 
-	const burst = collectEmitters(model, lid, def);
+	const burst = lid !== undefined ? collectEmitters(model, lid, def, effects) : [];
 
-	// Where the visual centre sits relative to the pivot, and how big the crate
-	// is — the presenter needs both to spin it in place and frame it properly.
-	const [boxCF, boxSize] = model.GetBoundingBox();
-	const centerOffset = model.GetPivot().ToObjectSpace(boxCF).Position;
-	const radius = math.max(boxSize.X, boxSize.Y, boxSize.Z);
+	// Where the visual centre sits relative to the root, and how big the crate
+	// is — the presenter needs both to spin it in place and stage it properly.
+	const { center, radius } = measure(model, root);
+	const centerOffset = root.CFrame.ToObjectSpace(new CFrame(center)).Position;
+
+	print(`[Crate] ${def.id}: rigged=${rigged}, radius=${string.format("%.1f", radius)}`);
 
 	return {
-		centerOffset,
-		radius,
 		model,
 		root,
-		lid,
-		lidRest: root.CFrame.ToObjectSpace(lid.CFrame),
+		radius,
+		centerOffset,
 		light,
 		burst,
+		rigged,
+		track: undefined, // bound after the model is parented, see bindAnimation
+		effects,
+		display: displayOffset(model, root, def),
+		lid,
+		lidRest: lid !== undefined ? root.CFrame.ToObjectSpace(lid.CFrame) : undefined,
 	};
 }

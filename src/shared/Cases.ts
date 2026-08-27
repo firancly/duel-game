@@ -1,7 +1,7 @@
 import { Rarity } from "./Catalog";
 
 // How many clicks on the 3D crate are needed to pop it open.
-export const CLICKS_TO_OPEN = 3;
+export const CLICKS_TO_OPEN = 1;
 
 // A shop case: costs `price`, rolls a rarity by `weights`, then gives a random
 // skin of that rarity. Weights are relative odds (don't need to sum to 100).
@@ -13,7 +13,13 @@ export interface CaseDef {
 
 	// Presentation (client only, ignored by the server roll):
 	color?: Color3; // tint for the procedurally built crate
-	modelName?: string; // name under ReplicatedStorage/Assets/Cases, defaults to `id`
+	modelName?: string; // extra name to look for under ReplicatedStorage/Assets/Cases; `id` is tried first
+	animationId?: string; // published opening animation, e.g. "rbxassetid://123". Falls back to the
+	// model's AnimSaves KeyframeSequence, which only registers reliably in Studio.
+	animationName?: string; // which take in AnimSaves to use, when the model holds several
+	displayYaw?: number; // degrees to turn the crate so its front faces the player. Rotating the
+	// model's RootPart in Studio does nothing — the presenter overwrites that CFrame every frame.
+	// A "DisplayYaw" attribute on the Model wins over this value.
 }
 
 export const Cases = new Map<string, CaseDef>([
@@ -70,6 +76,7 @@ export const Cases = new Map<string, CaseDef>([
 			weights: { [Rarity.Rare]: 35, [Rarity.Epic]: 40, [Rarity.Legendary]: 22, [Rarity.Mythic]: 3 },
 			color: Color3.fromRGB(215, 60, 60),
 			modelName: "RedCase",
+			animationName: "Mythic", // AnimSaves also holds an "Automatic Save" scratch take
 		},
 	],
 ]);

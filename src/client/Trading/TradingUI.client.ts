@@ -3,6 +3,7 @@ import { PresenceState } from "shared/Presence";
 import { TradePlayerInfo, MAX_OFFER } from "shared/types/Trade";
 import { getDef } from "shared/Catalog";
 import { Store } from "../Inventory/Store";
+import * as WindowManager from "../UI/WindowManager";
 
 const player = Players.LocalPlayer;
 const gui = player.WaitForChild("PlayerGui").WaitForChild("MainScreen");
@@ -140,11 +141,22 @@ function setTradeTab(tab: Tabs) {
 	refreshList();
 }
 
+WindowManager.register("Trade", () => {
+	tradeGui.Visible = false;
+	tradeSecond.Visible = false;
+	listOpen = false;
+});
+
 let listOpen = false;
 (menu.WaitForChild("Trades") as ImageButton).Activated.Connect(() => {
 	listOpen = !listOpen;
+	if (listOpen) {
+		WindowManager.open("Trade");
+		refreshList();
+	} else {
+		WindowManager.closed("Trade");
+	}
 	tradeGui.Visible = listOpen;
-	if (listOpen) refreshList();
 });
 
 // tab buttons (ContainerButtons: "AllButton" = All, FriendButton = Friends, ServerButton = Server)
@@ -197,8 +209,6 @@ notifDecline.Activated.Connect(() => {
 });
 
 // your offer
-// The offer scroll shows your tradeable skins. Click one to cycle how many
-// copies you're offering: 0, 1, 2, ... up to owned, then back to 0. (No + button in this layout.)
 const offer = new Map<string, number>();
 
 function syncOffer() {
@@ -307,6 +317,7 @@ tradeConfirmed.OnClientEvent.Connect(() => systemMessage("The other player accep
 tradeState.OnClientEvent.Connect((text: string) => (tradeStateLabel.Text = text));
 
 tradeComplete.OnClientEvent.Connect((success: boolean) => {
+	WindowManager.closed("Trade");
 	tradeSecond.Visible = false;
 	offer.clear();
 	systemMessage(success ? "Trade complete!" : "Trade cancelled.");
@@ -322,6 +333,7 @@ function resetOffer() {
 }
 
 tradeStarted.OnClientEvent.Connect((otherUserId: number, otherDisplayName: string) => {
+	WindowManager.open("Trade"); // covers accepting an invite while the list was never opened
 	tradeGui.Visible = false;
 	listOpen = false;
 
@@ -342,5 +354,7 @@ export {};
 // Logic for close button
 const closeBtn = tradeGui.WaitForChild("CloseButton") as GuiButton;
 closeBtn.MouseButton1Click.Connect(() => {
+	WindowManager.closed("Trade");
+	listOpen = false;
 	(closeBtn.Parent as GuiObject).Visible = false;
 });

@@ -9,7 +9,7 @@ type Result = { success: true; balance: number } | { success: false; reason: str
 
 function onPlayerAdded(player: Player) {
 	const state = new WalletState(player);
-	state.amount = 100; // TEMP starting coins for testing
+	state.amount = 1000000; // TEMP starting coins for testing
 	wallets.set(player, state);
 	print("[CurrencyService] Loaded wallet for:", player.Name);
 }

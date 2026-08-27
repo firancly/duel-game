@@ -1,5 +1,6 @@
 import { Players } from "@rbxts/services";
 import { getDef, WeaponSlot } from "shared/Catalog";
+import * as WindowManager from "../UI/WindowManager";
 import { Store } from "./Store";
 
 const EQUIPPED_IMAGE = "rbxassetid://126931322651156";
@@ -103,15 +104,22 @@ export function init(requestEquip: (id: string) => void) {
 }
 
 // Logic to open/close the inventory GUI
+WindowManager.register("Inventory", () => (invGui.Visible = false));
+
 const inventoryBtn = gui.WaitForChild("MainFrame").WaitForChild("Menu").WaitForChild("Inventory") as ImageButton;
-let inventoryGuiVisible = false;
 inventoryBtn.MouseButton1Click.Connect(() => {
-	inventoryGuiVisible = !inventoryGuiVisible;
-	invGui.Visible = inventoryGuiVisible;
+	if (invGui.Visible) {
+		WindowManager.closed("Inventory");
+		invGui.Visible = false;
+	} else {
+		WindowManager.open("Inventory");
+		invGui.Visible = true;
+	}
 });
 
 // Logic for close button
 const closeBtn = invGui.WaitForChild("CloseButton") as GuiButton;
 closeBtn.MouseButton1Click.Connect(() => {
+	WindowManager.closed("Inventory");
 	(closeBtn.Parent as GuiObject).Visible = false;
 });

@@ -3,11 +3,13 @@ import * as InventoryService from "./Inventory";
 import * as TradeService from "./Trade/TradeService";
 import * as CurrencyService from "./Currency";
 import * as ShopService from "./Shop";
+import * as Monetization from "./Shop/Monetization";
 
 InventoryService.init();
 TradeService.init();
 CurrencyService.init();
 ShopService.init();
+Monetization.init();
 
 // Setup chat commands
 Players.PlayerAdded.Connect((player) => {

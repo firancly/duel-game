@@ -13,6 +13,7 @@
 import { Players, RunService, TweenService, UserInputService, Workspace } from "@rbxts/services";
 import { Cases, CLICKS_TO_OPEN } from "shared/Cases";
 import { getDef, Rarity, RarityColor } from "shared/Catalog";
+import { ANIMATION_SPEED, ANIMATION_WEIGHT, CrateVFX, VfxTiming } from "shared/CrateVFX";
 import * as CrateModel from "./CrateModel";
 import { Crate } from "./CrateModel";
 
@@ -21,10 +22,16 @@ const player = Players.LocalPlayer;
 // tuning
 const CRATE_DIST_SCALE = 2.6; // how far ahead of the camera, as a multiple of the crate's largest extent
 const CRATE_MIN_DIST = 10;
+const CRATE_MAX_DIST = 40; // never stage so far out that the crate reads as a speck
+const CAMERA_LIFT = 3; // studs the leveled camera is raised, so the crate stages below eye level instead of dead in the player's face
 const DRAG_SENSITIVITY = 0.006; // radians per pixel
 const PITCH_LIMIT = 1.0; // radians
 const CLICK_SLOP = 8; // pixels of movement still counted as a click, not a drag
 const REVEAL_HOLD = 4; // seconds the reward stays up before auto-closing
+
+// Drag-to-spin is parked, not deleted — bring it back (ALLOW_DRAG_ROTATE = true)
+// once skins can walk out of the opened crate and need to be looked at.
+const ALLOW_DRAG_ROTATE = false;
 
 // Optional sfx — drop your own rbxassetid in, empty string means silent.
 const SOUND_CLICK = "";
@@ -101,11 +108,16 @@ function humanoid(): Humanoid | undefined {
 	return player.Character?.FindFirstChildOfClass("Humanoid");
 }
 
-// The crate is staged directly ahead of the camera, dead centre of the screen.
-// The camera itself never moves, so the character stays behind it and out of
-// frame — distance back off is driven by how big the crate actually is.
+function levelCamera(cam: Camera) {
+	const look = cam.CFrame.LookVector;
+	const flat = new Vector3(look.X, 0, look.Z);
+	const facing = flat.Magnitude > 0.01 ? flat.Unit : new Vector3(0, 0, -1);
+	const position = cam.CFrame.Position.add(new Vector3(0, CAMERA_LIFT, 0));
+	cam.CFrame = CFrame.lookAt(position, position.add(facing));
+}
+
 function stageCFrame(cam: Camera, radius: number): CFrame {
-	let dist = math.max(CRATE_MIN_DIST, radius * CRATE_DIST_SCALE);
+	let dist = math.clamp(radius * CRATE_DIST_SCALE, CRATE_MIN_DIST, CRATE_MAX_DIST);
 
 	// If the player is facing a wall, pull the crate in so it doesn't stage inside it.
 	const params = new RaycastParams();
@@ -115,7 +127,14 @@ function stageCFrame(cam: Camera, radius: number): CFrame {
 	const hit = Workspace.Raycast(cam.CFrame.Position, cam.CFrame.LookVector.mul(dist), params);
 	if (hit !== undefined) dist = math.max(radius * 0.75 + 2, hit.Distance - radius * 0.6);
 
-	return cam.CFrame.mul(new CFrame(0, 0, -dist));
+	const position = cam.CFrame.Position.add(cam.CFrame.LookVector.mul(dist));
+
+	// Face the camera on the horizontal plane only, keeping world up as up.
+	const back = cam.CFrame.Position.sub(position);
+	const flat = new Vector3(back.X, 0, back.Z);
+	const facing = flat.Magnitude > 0.01 ? flat.Unit : new Vector3(0, 0, -1);
+
+	return CFrame.lookAt(position, position.add(facing));
 }
 
 // Belt and braces: on a close camera the character can still poke into shot, so
@@ -145,11 +164,26 @@ function registerClick() {
 	if (crate === undefined) return;
 
 	clicks += 1;
-	punch = 1;
 	playSound(SOUND_CLICK, crate.root);
-	for (const e of crate.burst) e.Emit(12);
 
-	// lid creeps open a little more with every hit
+	// Rigged crate: each click releases the next slice of the authored animation,
+	// which the render loop pauses at. The last click lets it run to the end.
+	if (crate.track !== undefined) {
+		if (!crate.track.IsPlaying) crate.track.Play(0);
+		crate.track.AdjustSpeed(ANIMATION_SPEED);
+		return;
+	}
+
+	// Rigged but the animation never loaded: no lid to move by hand, so the
+	// clicks just count down to the reveal.
+	if (crate.rigged) {
+		if (clicks >= CLICKS_TO_OPEN) reveal();
+		return;
+	}
+
+	// Static crate: the lid creeps open a little more with every hit.
+	punch = 1;
+	for (const e of crate.burst) e.Emit(12);
 	const progress = math.min(clicks / CLICKS_TO_OPEN, 1);
 	lidLiftTarget = progress * 0.35;
 	lidTiltTarget = progress * 0.12;
@@ -223,17 +257,103 @@ function buildBillboard(parent: BasePart, skinId: string, rarity: string | undef
 let pendingSkinId: string | undefined;
 let pendingRarity: string | undefined;
 
-function reveal() {
-	if (crate === undefined || state !== "Presenting") return;
-	state = "Revealed";
+// One scheduled effect part: when it starts, when it stops, when it next pulses.
+interface VfxLane {
+	emitters: ParticleEmitter[];
+	timing: VfxTiming;
+	started: boolean;
+	finished: boolean;
+	nextEmit: number;
+}
 
+let vfxLanes: VfxLane[] = [];
+let vfxClock = 0; // animation seconds, frozen while the crate waits on a click
+
+function setEnabled(emitters: ParticleEmitter[], enabled: boolean) {
+	for (const e of emitters) e.Enabled = enabled;
+}
+
+function emit(emitters: ParticleEmitter[], amount: number) {
+	for (const e of emitters) if (e.Parent !== undefined) e.Emit(amount);
+}
+
+// Match each effect part in the model to its timing from the animator's config.
+function buildVfxSchedule() {
+	vfxLanes = [];
+	vfxClock = 0;
+	if (crate === undefined) return;
+
+	for (const [name, emitters] of crate.effects) {
+		const timing = CrateVFX.get(name);
+		if (timing === undefined) {
+			warn(`[Crate] no VFX timing for "${name}" — add it to shared/CrateVFX.ts`);
+			continue;
+		}
+		setEnabled(emitters, false);
+		vfxLanes.push({ emitters, timing, started: false, finished: false, nextEmit: timing.delay });
+	}
+}
+
+// Runs every frame while the animation is moving. Mirrors the animator's looper:
+// enable at `delay`, Emit(amount) every `step`, disable after `duration`.
+function stepVfx(dt: number) {
+	if (vfxLanes.size() === 0) return;
+	vfxClock += dt;
+
+	for (const lane of vfxLanes) {
+		if (lane.finished) continue;
+		const { amount, delay, duration, step } = lane.timing;
+		if (vfxClock < delay) continue;
+
+		// amount <= 0 in the config means the part is deliberately silent
+		if (amount <= 0) {
+			setEnabled(lane.emitters, false);
+			lane.finished = true;
+			continue;
+		}
+
+		if (!lane.started) {
+			lane.started = true;
+			setEnabled(lane.emitters, true);
+		}
+
+		if (vfxClock >= delay + duration) {
+			setEnabled(lane.emitters, false);
+			lane.finished = true;
+			continue;
+		}
+
+		if (vfxClock >= lane.nextEmit) {
+			emit(lane.emitters, amount);
+			lane.nextEmit += math.max(step, 1 / 60);
+		}
+	}
+}
+
+// Nothing matched the config: fire everything once so the crate isn't silent.
+function playAllEffects() {
+	if (crate === undefined) return;
+	for (const [, emitters] of crate.effects) {
+		setEnabled(emitters, true);
+		emit(emitters, 20);
+	}
+}
+
+function stopAllEffects() {
+	if (crate === undefined) return;
+	for (const [, emitters] of crate.effects) setEnabled(emitters, false);
+}
+
+// Static crates only: pop the lid off in code. Rigged crates do this in the
+// authored animation, so they go straight to reveal().
+function popLid() {
+	if (crate === undefined) return;
 	const c = crate;
-	const skinId = pendingSkinId;
+	if (c.lid === undefined) return;
 
 	// lid leaves the model so it can fly off independently of the crate's spin
 	lidDetached = true;
 	c.lid.Parent = folder;
-	playSound(SOUND_OPEN, c.root);
 	for (const e of c.burst) e.Emit(60);
 
 	const flyTo = c.lid.CFrame.mul(new CFrame(0, math.max(6, c.radius * 1.5), 0)).mul(
@@ -243,6 +363,19 @@ function reveal() {
 		CFrame: flyTo,
 		Transparency: 1,
 	}).Play();
+}
+
+function reveal() {
+	if (crate === undefined || state !== "Presenting") return;
+	state = "Revealed";
+
+	const c = crate;
+	const skinId = pendingSkinId;
+
+	playSound(SOUND_OPEN, c.root);
+	popLid();
+	// A crate whose effect parts aren't in the config would otherwise be silent.
+	if (vfxLanes.size() === 0) playAllEffects();
 
 	const color = skinId !== undefined ? buildBillboard(c.root, skinId, pendingRarity, c.radius) : c.light.Color;
 
@@ -293,6 +426,10 @@ function onInputChanged(input: InputObject) {
 	lastPos = new Vector2(input.Position.X, input.Position.Y);
 
 	dragDistance += new Vector2(dx, dy).Magnitude;
+
+	// Rotation itself is disabled (see ALLOW_DRAG_ROTATE) but dragDistance still
+	// has to accumulate above so onInputEnded can tell a click from a drag.
+	if (!ALLOW_DRAG_ROTATE) return;
 	yaw -= dx * DRAG_SENSITIVITY;
 	pitch = math.clamp(pitch - dy * DRAG_SENSITIVITY, -PITCH_LIMIT, PITCH_LIMIT);
 }
@@ -310,6 +447,23 @@ function onInputEnded(input: InputObject) {
 	if (wasClick && state === "Presenting") registerClick();
 }
 
+// Freeze just short of the animation's last frame instead of letting it run
+// to the actual end — keeps the crate sitting open (lid up) rather than
+// whatever the clip's final frame happens to be. Length reads 0 until the
+// animation finishes loading, hence the guard. Clamped to half the clip's
+// length so a short animation can't get held before it's even opened.
+const END_HOLD = 0.15; // seconds before the end to freeze at
+function holdBeforeEnd() {
+	const track = crate?.track;
+	if (track === undefined || !track.IsPlaying || track.Speed <= 0 || track.Length <= 0) return;
+
+	const buffer = math.min(END_HOLD, track.Length * 0.5);
+	if (track.TimePosition >= track.Length - buffer) {
+		track.AdjustSpeed(0);
+		reveal();
+	}
+}
+
 function onRender(dt: number) {
 	if (crate === undefined) return;
 	elapsed += dt;
@@ -318,7 +472,7 @@ function onRender(dt: number) {
 	setCharacterHidden(true);
 
 	punch = math.max(0, punch - dt * 4);
-	const shake = punch * 0.1;
+	const shake = crate.rigged ? 0 : punch * 0.1;
 
 	// Rotate about the crate's bounding-box centre: models whose pivot sits at
 	// the base would otherwise swing in a circle instead of spinning in place.
@@ -326,13 +480,31 @@ function onRender(dt: number) {
 		.mul(CFrame.Angles(0, yaw, 0))
 		.mul(CFrame.Angles(pitch, 0, 0))
 		.mul(CFrame.Angles(math.sin(elapsed * 60) * shake, 0, math.cos(elapsed * 50) * shake));
-	crate.model.PivotTo(spin.mul(new CFrame(crate.centerOffset.mul(-1))));
 
-	if (!lidDetached) {
+	// stage/spin -> the model's own orientation fix -> recentre on the stage point
+	const placed = spin.mul(crate.display).mul(new CFrame(crate.centerOffset.mul(-1)));
+
+	// A rig is posed by its Motor6Ds off the anchored root, so move the root and
+	// let the animation place everything else. PivotTo would fight it.
+	if (crate.rigged) crate.root.CFrame = placed;
+	else crate.model.PivotTo(placed);
+
+	holdBeforeEnd();
+
+	// The VFX clock only advances while the crate is actually opening, so a
+	// timeline authored against a continuous play still lines up when the
+	// player leaves the crate paused between clicks.
+	const track = crate.track;
+	if (track === undefined || (track.IsPlaying && track.Speed > 0) || state === "Revealed") stepVfx(dt);
+
+	// Static crates carry their lid by hand; a rig has no loose lid to place.
+	const lid = crate.lid;
+	const lidRest = crate.lidRest;
+	if (!lidDetached && lid !== undefined && lidRest !== undefined) {
 		const a = math.min(1, dt * 8);
 		lidLift += (lidLiftTarget - lidLift) * a;
 		lidTilt += (lidTiltTarget - lidTilt) * a;
-		crate.lid.CFrame = crate.root.CFrame.mul(crate.lidRest)
+		lid.CFrame = crate.root.CFrame.mul(lidRest)
 			.mul(new CFrame(0, lidLift, 0))
 			.mul(CFrame.Angles(lidTilt, 0, 0));
 	}
@@ -348,6 +520,18 @@ function connectAll() {
 
 	const hum = humanoid();
 	if (hum !== undefined) connections.push(hum.Died.Connect(() => finish()));
+
+	// VFX are on the timeline in shared/CrateVFX.ts, not on markers.
+	const track = crate?.track;
+	if (track === undefined) return;
+
+	// Normal path: holdBeforeEnd() (in onRender) freezes the track just short
+	// of its last frame and reveals then, so the crate ends up sitting open
+	// instead of on whatever the clip's actual final frame is. This is only a
+	// backstop for the case that never happens — Length staying 0 forever, or
+	// something Stopping the track before holdBeforeEnd caught it.
+	// (Deliberately not using OPEN_MARKER — see holdBeforeEnd.)
+	connections.push(track.Stopped.Connect(() => reveal()));
 }
 
 function disconnectAll() {
@@ -376,6 +560,9 @@ export function finish() {
 	setCharacterHidden(false);
 	dragging = false;
 	unlockMouse();
+	stopAllEffects();
+	vfxLanes = [];
+	crate?.track?.Stop(0);
 
 	// The camera never moved, so handing it back is just restoring the mode.
 	const cam = camera();
@@ -448,11 +635,27 @@ export function present(caseId: string, skinId: string, rarity: string | undefin
 	savedCameraCF = cam.CFrame;
 	savedCameraSubject = cam.CameraSubject;
 	cam.CameraType = Enum.CameraType.Scriptable;
+	levelCamera(cam); // horizontal + straight ahead, regardless of where the player was looking
 
 	crate = built;
 	baseCF = stageCFrame(cam, built.radius);
+	print(
+		`[Crate] staged ${caseId} at ${string.format("%.1f", cam.CFrame.Position.sub(baseCF.Position).Magnitude)} studs`,
+	);
 	built.model.Parent = folder;
-	built.model.PivotTo(baseCF.mul(new CFrame(built.centerOffset.mul(-1))));
+	built.model.PivotTo(baseCF.mul(built.display).mul(new CFrame(built.centerOffset.mul(-1))));
+
+	// The rig has to be in the world before its animation will load. Then hold it
+	// on frame 0 so the crate starts closed rather than in its saved bind pose.
+	const track = CrateModel.bindAnimation(built, def);
+	if (track !== undefined) {
+		track.Play(0);
+		track.AdjustWeight(ANIMATION_WEIGHT, 0);
+		track.AdjustSpeed(0);
+		track.TimePosition = 0;
+	}
+
+	buildVfxSchedule();
 
 	rayParams = new RaycastParams();
 	rayParams.FilterType = Enum.RaycastFilterType.Include;
