@@ -1,58 +1,79 @@
 import { Players } from "@rbxts/services";
-import { WalletState } from "./core/CurrencyState";
+import ProfileStore, { Profile } from "@rbxts/profile-store";
+import { DEFAULT_PLAYER_CURRENCY_DATA, PlayerCurrencyData } from "./core/CurrencyState";
 import { Replicator } from "./replication/replicator";
 import { CoinActions } from "./replication/actions";
 
-const wallets = new Map<Player, WalletState>();
+const CurrencyStore = ProfileStore.New("PlayerCurrency", DEFAULT_PLAYER_CURRENCY_DATA);
+const wallets = new Map<Player, Profile<PlayerCurrencyData>>();
 
 type Result = { success: true; balance: number } | { success: false; reason: string };
 
 function onPlayerAdded(player: Player) {
-	const state = new WalletState(player);
-	state.amount = 1000000; // TEMP starting coins for testing
-	wallets.set(player, state);
+	const wallet = CurrencyStore.StartSessionAsync(`${player.UserId}`, {
+		Cancel: () => player.Parent !== Players,
+	}) as Profile<PlayerCurrencyData> | undefined;
+
+	if (wallet === undefined || player.Parent !== Players) {
+		wallet?.EndSession();
+		player.Kick("Failed to load currency profile. Rejoin");
+		return;
+	}
+
+	wallet.Reconcile();
+	wallet.AddUserId(player.UserId);
+
+	wallet.OnSessionEnd.Connect(() => {
+		wallets.delete(player);
+		player.Kick("Your data session ended. Rejoin to continue playing.");
+	});
+
+	wallets.set(player, wallet);
+	Replicator.sendInit(player, { player, amount: wallet.Data.coins });
+
 	print("[CurrencyService] Loaded wallet for:", player.Name);
 }
 
 function onPlayerRemoving(player: Player) {
+	wallets.get(player)?.EndSession();
 	wallets.delete(player);
 }
 
 export function getBalance(player: Player): number {
-	return wallets.get(player)?.amount ?? 0;
+	return wallets.get(player)?.Data.coins ?? 0;
 }
 
 // give coins
 export function earn(player: Player, amount: number): Result {
 	if (amount <= 0) return { success: false, reason: "INVALID_AMOUNT" };
-	const state = wallets.get(player);
-	if (state === undefined) return { success: false, reason: "NO_WALLET" };
+	const profile = wallets.get(player);
+	if (profile === undefined) return { success: false, reason: "NO_WALLET" };
 
-	state.amount += amount;
-	Replicator.sendEarn(player, state.amount);
-	return { success: true, balance: state.amount };
+	profile.Data.coins += amount;
+	Replicator.sendEarn(player, profile.Data.coins);
+	return { success: true, balance: profile.Data.coins };
 }
 
 // take coins, fails if they can't afford it
 export function spend(player: Player, amount: number): Result {
 	if (amount <= 0) return { success: false, reason: "INVALID_AMOUNT" };
-	const state = wallets.get(player);
-	if (state === undefined) return { success: false, reason: "NO_WALLET" };
-	if (state.amount < amount) return { success: false, reason: "INSUFFICIENT" };
+	const profile = wallets.get(player);
+	if (profile === undefined) return { success: false, reason: "NO_WALLET" };
+	if (profile.Data.coins < amount) return { success: false, reason: "INSUFFICIENT" };
 
-	state.amount -= amount;
-	Replicator.sendSpend(player, state.amount);
-	return { success: true, balance: state.amount };
+	profile.Data.coins -= amount;
+	Replicator.sendSpend(player, profile.Data.coins);
+	return { success: true, balance: profile.Data.coins };
 }
 
 // overwrite balance (admin/debug)
 export function setBalance(player: Player, amount: number): Result {
-	const state = wallets.get(player);
-	if (state === undefined) return { success: false, reason: "NO_WALLET" };
+	const profile = wallets.get(player);
+	if (profile === undefined) return { success: false, reason: "NO_WALLET" };
 
-	state.amount = math.max(0, amount);
-	Replicator.sendSet(player, state.amount);
-	return { success: true, balance: state.amount };
+	profile.Data.coins = math.max(0, amount);
+	Replicator.sendSet(player, profile.Data.coins);
+	return { success: true, balance: profile.Data.coins };
 }
 
 export function init() {
@@ -61,8 +82,8 @@ export function init() {
 	for (const player of Players.GetPlayers()) onPlayerAdded(player);
 
 	Replicator.onAskForWallet((player) => {
-		const state = wallets.get(player);
-		return state !== undefined ? CoinActions.init(state) : undefined;
+		const profile = wallets.get(player);
+		return profile !== undefined ? CoinActions.init({ player, amount: profile.Data.coins }) : undefined;
 	});
 
 	print("[CurrencyService] Initialized");

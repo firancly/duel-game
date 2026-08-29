@@ -13,7 +13,7 @@ function setBalance(amount: number) {
 }
 
 const snapshot = askForWallet.InvokeServer() as { amount: number };
-setBalance(snapshot.amount);
+setBalance(snapshot?.amount ?? 0);
 
 walletUpdate.OnClientEvent.Connect((_action: string, payload: unknown) => {
 	setBalance((payload as { amount: number }).amount);
