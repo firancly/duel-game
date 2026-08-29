@@ -27,6 +27,7 @@
     "typescript-eslint": "^8.65.0"
   },
   "dependencies": {
+    "@rbxts/profile-store": "^1.0.3",
     "@rbxts/services": "^1.6.0"
   }
 }

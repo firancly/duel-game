@@ -36,6 +36,7 @@ export interface SkinDef {
 	slot: WeaponSlot; // which of the 3 weapons this skin goes on
 	rarity: Rarity;
 	tradeable: boolean; // gate for the future trade system
+	model?: string; // child name under ReplicatedStorage/Assets/Weapons, for the crate reveal
 }
 
 // id -> definition. Add every new skin here.
@@ -50,6 +51,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Common,
 			tradeable: false,
+			model: "default_knife",
 		},
 	],
 	[
@@ -61,6 +63,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Common,
 			tradeable: true,
+			model: "knifeafterpaint",
 		},
 	],
 	[
@@ -72,6 +75,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Common,
 			tradeable: true,
+			model: "knifeHunter",
 		},
 	],
 	[
@@ -83,6 +87,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Common,
 			tradeable: true,
+			model: "knifeArmyCamo",
 		},
 	],
 	[
@@ -94,6 +99,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Rare,
 			tradeable: true,
+			model: "knifeFrost",
 		},
 	],
 	[
@@ -105,6 +111,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Epic,
 			tradeable: true,
+			model: "EnergySpecKnife",
 		},
 	],
 	[
@@ -116,6 +123,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Legendary,
 			tradeable: true,
+			model: "GoldenDagger",
 		},
 	],
 	[
@@ -127,6 +135,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Mythic,
 			tradeable: true,
+			model: "ShadowReaper",
 		},
 	],
 	[
@@ -138,6 +147,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Mythic,
 			tradeable: true,
+			model: "LavaBlade",
 		},
 	],
 	[
@@ -149,6 +159,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Epic,
 			tradeable: true,
+			model: "NeonSpecKnife",
 		},
 	],
 
@@ -162,6 +173,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Common,
 			tradeable: false,
+			model: "revolver",
 		},
 	],
 	[
@@ -173,6 +185,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Common,
 			tradeable: true,
+			model: "revolverMatteBlack",
 		},
 	],
 	[
@@ -184,6 +197,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Common,
 			tradeable: true,
+			model: "revolverIvory",
 		},
 	],
 	[
@@ -195,6 +209,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Common,
 			tradeable: true,
+			model: "revolverBronze",
 		},
 	],
 	[
@@ -206,6 +221,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Rare,
 			tradeable: true,
+			model: "revolverUrbanSteel",
 		},
 	],
 	[
@@ -217,6 +233,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Rare,
 			tradeable: true,
+			model: "revolverRedline",
 		},
 	],
 	[
@@ -228,6 +245,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Rare,
 			tradeable: true,
+			model: "revolverNightShade",
 		},
 	],
 	[
@@ -239,6 +257,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Epic,
 			tradeable: true,
+			model: "VoltageMagnum",
 		},
 	],
 	[
@@ -250,6 +269,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Epic,
 			tradeable: true,
+			model: "CyberMagnum",
 		},
 	],
 	[
@@ -261,6 +281,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Legendary,
 			tradeable: true,
+			model: "GoldenFangRevolver",
 		},
 	],
 	[
@@ -272,6 +293,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Mythic,
 			tradeable: true,
+			model: "VoidWalker",
 		},
 	],
 	[
@@ -283,6 +305,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Mythic,
 			tradeable: true,
+			model: "HellfireRevolver",
 		},
 	],
 
@@ -296,6 +319,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Common,
 			tradeable: false,
+			model: "rifle",
 		},
 	],
 	[
@@ -307,6 +331,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Common,
 			tradeable: true,
+			model: "rifleBlackOps",
 		},
 	],
 	[
@@ -318,6 +343,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Common,
 			tradeable: true,
+			model: "rifleArctic",
 		},
 	],
 	[
@@ -329,6 +355,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Common,
 			tradeable: true,
+			model: "rifleWoodland",
 		},
 	],
 	[
@@ -340,6 +367,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Common,
 			tradeable: true,
+			model: "rifleDesert",
 		},
 	],
 	[
@@ -351,6 +379,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Rare,
 			tradeable: true,
+			model: "ak47UrbanHex",
 		},
 	],
 	[
@@ -362,6 +391,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Rare,
 			tradeable: true,
+			model: "ak47Redline",
 		},
 	],
 	[
@@ -373,6 +403,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Rare,
 			tradeable: true,
+			model: "ak47TactBlue",
 		},
 	],
 	[
@@ -384,6 +415,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Epic,
 			tradeable: true,
+			model: "m4ElectricCore",
 		},
 	],
 	[
@@ -395,6 +427,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Epic,
 			tradeable: true,
+			model: "m4NeonHunter",
 		},
 	],
 	[
@@ -406,6 +439,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Legendary,
 			tradeable: true,
+			model: "SilentStrikeSniper",
 		},
 	],
 	[
@@ -417,6 +451,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Mythic,
 			tradeable: true,
+			model: "VoidHarbingerAr",
 		},
 	],
 	[
@@ -428,6 +463,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Mythic,
 			tradeable: true,
+			model: "InfernoAr",
 		},
 	],
 ]);

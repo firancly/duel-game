@@ -1,7 +1,7 @@
 import { Rarity } from "./Catalog";
 
 // How many clicks on the 3D crate are needed to pop it open.
-export const CLICKS_TO_OPEN = 1;
+export const CLICKS_TO_OPEN = 0;
 
 // A shop case: costs `price`, rolls a rarity by `weights`, then gives a random
 // skin of that rarity. Weights are relative odds (don't need to sum to 100).
@@ -11,7 +11,7 @@ export interface CaseDef {
 	price: number;
 	weights: { [rarity: string]: number };
 
-	// Presentation (client only, ignored by the server roll):
+	// Presentation:
 	color?: Color3; // tint for the procedurally built crate
 	modelName?: string; // extra name to look for under ReplicatedStorage/Assets/Cases; `id` is tried first
 	animationId?: string; // published opening animation, e.g. "rbxassetid://123". Falls back to the

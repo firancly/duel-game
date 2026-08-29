@@ -1,16 +1,4 @@
-// The case-opening ceremony. Entirely client-side and cosmetic: the server has
-// already charged the player, rolled the skin and granted it by the time this
-// runs, so nothing here can be exploited for loot.
-//
-// present() -> the camera locks where it stands and the crate is staged dead
-// ahead of it (character hidden locally, so nothing blocks the view). The crate
-// sits still until touched: dragging rotates it, and CLICKS_TO_OPEN clicks pop
-// the lid. The skin is revealed on a billboard, then finish() tears it all down.
-//
-// The crate is created on the client inside Workspace, so it is local-only and
-// never replicates to other players.
-
-import { Players, RunService, TweenService, UserInputService, Workspace } from "@rbxts/services";
+import { Players, ReplicatedStorage, RunService, TweenService, UserInputService, Workspace } from "@rbxts/services";
 import { Cases, CLICKS_TO_OPEN } from "shared/Cases";
 import { getDef, Rarity, RarityColor } from "shared/Catalog";
 import { ANIMATION_SPEED, ANIMATION_WEIGHT, CrateVFX, VfxTiming } from "shared/CrateVFX";
@@ -22,8 +10,8 @@ const player = Players.LocalPlayer;
 // tuning
 const CRATE_DIST_SCALE = 2.6; // how far ahead of the camera, as a multiple of the crate's largest extent
 const CRATE_MIN_DIST = 10;
-const CRATE_MAX_DIST = 40; // never stage so far out that the crate reads as a speck
-const CAMERA_LIFT = 3; // studs the leveled camera is raised, so the crate stages below eye level instead of dead in the player's face
+const CRATE_MAX_DIST = 40; // never stage so far out
+const CRATE_DROP = 2; // studs the crate is staged below eye level
 const DRAG_SENSITIVITY = 0.006; // radians per pixel
 const PITCH_LIMIT = 1.0; // radians
 const CLICK_SLOP = 8; // pixels of movement still counted as a click, not a drag
@@ -112,8 +100,7 @@ function levelCamera(cam: Camera) {
 	const look = cam.CFrame.LookVector;
 	const flat = new Vector3(look.X, 0, look.Z);
 	const facing = flat.Magnitude > 0.01 ? flat.Unit : new Vector3(0, 0, -1);
-	const position = cam.CFrame.Position.add(new Vector3(0, CAMERA_LIFT, 0));
-	cam.CFrame = CFrame.lookAt(position, position.add(facing));
+	cam.CFrame = CFrame.lookAt(cam.CFrame.Position, cam.CFrame.Position.add(facing));
 }
 
 function stageCFrame(cam: Camera, radius: number): CFrame {
@@ -127,7 +114,7 @@ function stageCFrame(cam: Camera, radius: number): CFrame {
 	const hit = Workspace.Raycast(cam.CFrame.Position, cam.CFrame.LookVector.mul(dist), params);
 	if (hit !== undefined) dist = math.max(radius * 0.75 + 2, hit.Distance - radius * 0.6);
 
-	const position = cam.CFrame.Position.add(cam.CFrame.LookVector.mul(dist));
+	const position = cam.CFrame.Position.add(cam.CFrame.LookVector.mul(dist)).sub(new Vector3(0, CRATE_DROP, 0));
 
 	// Face the camera on the horizontal plane only, keeping world up as up.
 	const back = cam.CFrame.Position.sub(position);
@@ -257,6 +244,13 @@ function buildBillboard(parent: BasePart, skinId: string, rarity: string | undef
 let pendingSkinId: string | undefined;
 let pendingRarity: string | undefined;
 
+// The revealed weapon model, popped out of the crate at the end of the
+// animation. Parented under `folder`, so finish()'s folder?.Destroy() cleans
+// it up too — no separate teardown needed.
+let rewardWeapon: Model | undefined;
+let rewardWeaponBase: CFrame | undefined; // rest CFrame (no spin), set once the pop-out tween lands
+let rewardWeaponSpin = false;
+
 // One scheduled effect part: when it starts, when it stops, when it next pulses.
 interface VfxLane {
 	emitters: ParticleEmitter[];
@@ -365,6 +359,86 @@ function popLid() {
 	}).Play();
 }
 
+// Resolve a skin's actual weapon model, ReplicatedStorage/Assets/Weapons/<SkinDef.model>.
+function findWeaponModel(skinId: string): Model | undefined {
+	const def = getDef(skinId);
+	if (def === undefined) {
+		warn(`[Crate] getDef("${skinId}") returned nothing — no Catalog entry for that id`);
+		return undefined;
+	}
+	const name = def.model;
+	if (name === undefined) {
+		warn(`[Crate] Catalog entry "${skinId}" has no "model" field set`);
+		return undefined;
+	}
+
+	const assets = ReplicatedStorage.FindFirstChild("Assets");
+	if (assets === undefined) {
+		warn(`[Crate] ReplicatedStorage has no "Assets" folder`);
+		return undefined;
+	}
+	const weapons = assets.FindFirstChild("Weapons");
+	if (weapons === undefined) {
+		warn(`[Crate] ReplicatedStorage.Assets has no "Weapons" folder`);
+		return undefined;
+	}
+	const found = weapons.FindFirstChild(name);
+	if (found === undefined) {
+		warn(`[Crate] ReplicatedStorage.Assets.Weapons has no child "${name}" (skin "${skinId}")`);
+		return undefined;
+	}
+	if (!found.IsA("Model")) {
+		warn(`[Crate] ReplicatedStorage.Assets.Weapons.${name} is a ${found.ClassName}, not a Model`);
+		return undefined;
+	}
+	return found;
+}
+
+// Pop the won weapon out of the crate: rises from the root to hover above it,
+// then spins slowly in place for the rest of the reveal.
+function spawnRewardWeapon(root: BasePart, radius: number, skinId: string) {
+	const source = findWeaponModel(skinId);
+	if (source === undefined) return;
+
+	const weapon = source.Clone();
+	for (const d of weapon.GetDescendants()) {
+		if (d.IsA("BasePart")) {
+			d.Anchored = true;
+			d.CanCollide = false;
+			d.CanTouch = false;
+			d.CanQuery = false;
+			d.Massless = true;
+		}
+	}
+	weapon.Parent = folder;
+
+	const startCF = root.CFrame;
+	const restCF = root.CFrame.mul(new CFrame(0, math.max(2.4, radius * 0.9), 0));
+	weapon.PivotTo(startCF);
+
+	// TweenService can't animate Model:PivotTo directly, so drive it through a
+	// CFrameValue and re-pivot on every step of the tween.
+	const driver = new Instance("CFrameValue");
+	driver.Value = startCF;
+	driver.Parent = weapon;
+	driver.Changed.Connect((v) => weapon.PivotTo(v));
+
+	const tween = TweenService.Create(driver, new TweenInfo(0.9, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Value: restCF,
+	});
+	tween.Completed.Connect(() => {
+		rewardWeaponBase = restCF;
+		rewardWeaponSpin = true;
+	});
+	tween.Play();
+
+	rewardWeapon = weapon;
+	rewardWeaponBase = undefined;
+	rewardWeaponSpin = false;
+
+	print(`[Crate] reward weapon "${skinId}" -> ${source.Name}, popping to ${tostring(restCF.Position)}`);
+}
+
 function reveal() {
 	if (crate === undefined || state !== "Presenting") return;
 	state = "Revealed";
@@ -374,6 +448,7 @@ function reveal() {
 
 	playSound(SOUND_OPEN, c.root);
 	popLid();
+	if (skinId !== undefined) spawnRewardWeapon(c.root, c.radius, skinId);
 	// A crate whose effect parts aren't in the config would otherwise be silent.
 	if (vfxLanes.size() === 0) playAllEffects();
 
@@ -497,6 +572,11 @@ function onRender(dt: number) {
 	const track = crate.track;
 	if (track === undefined || (track.IsPlaying && track.Speed > 0) || state === "Revealed") stepVfx(dt);
 
+	// Slow showcase spin once the pop-out tween has landed the weapon at rest.
+	if (rewardWeaponSpin && rewardWeapon !== undefined && rewardWeaponBase !== undefined) {
+		rewardWeapon.PivotTo(rewardWeaponBase.mul(CFrame.Angles(0, elapsed * 1.1, 0)));
+	}
+
 	// Static crates carry their lid by hand; a rig has no loose lid to place.
 	const lid = crate.lid;
 	const lidRest = crate.lidRest;
@@ -579,6 +659,9 @@ export function finish() {
 	folder = undefined;
 	crate = undefined;
 	rayParams = undefined;
+	rewardWeapon = undefined;
+	rewardWeaponBase = undefined;
+	rewardWeaponSpin = false;
 
 	state = "Idle";
 	const cb = onDone;
@@ -625,6 +708,9 @@ export function present(caseId: string, skinId: string, rarity: string | undefin
 	lidTiltTarget = 0;
 	lidDetached = false;
 	elapsed = 0;
+	rewardWeapon = undefined;
+	rewardWeaponBase = undefined;
+	rewardWeaponSpin = false;
 
 	folder = new Instance("Folder");
 	folder.Name = "CratePresentation";
