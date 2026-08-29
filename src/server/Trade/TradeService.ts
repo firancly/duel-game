@@ -114,7 +114,7 @@ function handleOfferUpdate(player: Player, offerRecord: unknown) {
 		if (!typeIs(id, "string") || !typeIs(count, "number")) continue;
 		const def = getDef(id);
 		if (def === undefined || !def.tradeable) continue;
-		const owned = state.items.get(id)?.size() ?? 0;
+		const owned = state.items[id]?.size() ?? 0;
 		const amount = math.min(count, owned, MAX_OFFER - total); // owned + within limit
 		if (amount > 0) {
 			validated.set(id, amount);
@@ -145,7 +145,7 @@ function ownsAll(player: Player, offer: Map<string, number>): boolean {
 	const state = InventoryService.getState(player);
 	if (state === undefined) return false;
 	for (const [id, count] of offer) {
-		if ((state.items.get(id)?.size() ?? 0) < count) return false;
+		if ((state.items[id]?.size() ?? 0) < count) return false;
 	}
 	return true;
 }

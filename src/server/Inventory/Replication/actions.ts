@@ -10,17 +10,16 @@ export enum InvAction {
 	UNEQUIP = "Unequip", // a slot reverted to default
 }
 
-// 2. Helpers: turn server Maps into plain objects the wire can carry
-//    (Maps don't cross RemoteEvents cleanly, so flatten to id->count / slot->id)
-function ownedToRecord(items: Map<string, ItemInstance[]>): { [id: string]: number } {
+// 2. Helpers: `items`/`equipped` are already plain records
+function ownedToRecord(items: Record<string, ItemInstance[]>): { [id: string]: number } {
 	const out: { [id: string]: number } = {};
-	for (const [id, copies] of items) out[id] = copies.size(); // count only, no uuids
+	for (const [id, copies] of pairs(items)) out[id] = copies.size(); // count only, no uuids
 	return out;
 }
 
-function equippedToRecord(equipped: Map<WeaponSlot, string>): { [slot: string]: string } {
+function equippedToRecord(equipped: Partial<Record<WeaponSlot, string>>): { [slot: string]: string } {
 	const out: { [slot: string]: string } = {};
-	for (const [slot, id] of equipped) out[slot] = id;
+	for (const [slot, id] of pairs(equipped)) out[slot] = id;
 	return out;
 }
 

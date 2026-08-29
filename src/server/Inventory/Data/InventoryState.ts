@@ -5,20 +5,8 @@ export interface ItemInstance {
 	serial?: number; // later
 	obtainedAt?: number; // later
 }
+
 export interface InventoryStateType {
-	player: Player;
-	items: Map<string, ItemInstance[]>; // id -> ItemInstance
-	equipped: Map<WeaponSlot, string>; // slot -> equipped skin
-}
-
-export class InventoryState implements InventoryStateType {
-	player: Player;
-	items = new Map<string, ItemInstance[]>();
-	equipped = new Map<WeaponSlot, string>(); // slot -> equipped skin
-
-	died = false;
-
-	constructor(player: Player) {
-		this.player = player;
-	}
+	items: Record<string, ItemInstance[]>; // id -> ItemInstance[]
+	equipped: Partial<Record<WeaponSlot, string>>; // slot -> equipped skin
 }

@@ -26,7 +26,10 @@ inventoryUpdate.OnClientEvent.Connect((action: string, payload: unknown) => {
 	}
 });
 
-const snapshot = askForInventory.InvokeServer() as InitPayload;
-Store.init(snapshot);
+// Can come back undefined if the server's profile hasn't finished loading
+// yet — the pushed "Init" from inventoryUpdate above will populate Store
+// once it has, so just skip the pull rather than initing with nothing.
+const snapshot = askForInventory.InvokeServer() as InitPayload | undefined;
+if (snapshot !== undefined) Store.init(snapshot);
 
 InventoryUI.init((id) => requestEquip.FireServer(id));

@@ -21,10 +21,10 @@ function createItem(state: InventoryStateType, itemId: string): ItemInstance {
 		uuid: uuid,
 	};
 
-	let items = state.items.get(itemId);
+	let items = state.items[itemId];
 	if (items === undefined) {
 		items = [];
-		state.items.set(itemId, items);
+		state.items[itemId] = items;
 	}
 	items.push(item);
 
@@ -66,29 +66,29 @@ export class Operations {
 		// if (uuids === undefined || uuids.size() === 0) return { success: false, reason: "NO_ITEM_IN_INVENTORY" };
 
 		// const uuid = uuids[0];
-		const items = state.items.get(itemId);
+		const items = state.items[itemId];
 		if (items === undefined || items.size() === 0) return { success: false, reason: "NOT_OWNED" };
 
 		const def = getDef(itemId);
 		if (def === undefined) return { success: false, reason: "NOT_IN_CATALOG" };
 
-		state.equipped.set(def.slot, itemId); // slot from catalog; set auto-replaces old skin
+		state.equipped[def.slot] = itemId; // slot from catalog; assigning replaces the old skin
 		warn(`Added ${itemId} to ${def.slot}`);
 		return { success: true, changedItem: { id: itemId, uuid: items[0].uuid } };
 	}
 
 	// remove one copy of itemId if it was the last copy and equipped, revert to default
 	static removeOne(state: InventoryStateType, itemId: string): OperationResult {
-		const items = state.items.get(itemId);
+		const items = state.items[itemId];
 		if (items === undefined || items.size() === 0) return { success: false, reason: "NOT_OWNED" };
 
 		const removed = items.pop()!;
 		if (items.size() === 0) {
-			state.items.delete(itemId);
+			delete state.items[itemId];
 			const def = getDef(itemId);
-			if (def !== undefined && state.equipped.get(def.slot) === itemId) {
+			if (def !== undefined && state.equipped[def.slot] === itemId) {
 				const fallback = DEFAULT_SKINS.get(def.slot);
-				if (fallback !== undefined) state.equipped.set(def.slot, fallback);
+				if (fallback !== undefined) state.equipped[def.slot] = fallback;
 			}
 		}
 		return { success: true, changedItem: { id: itemId, uuid: removed.uuid } };
