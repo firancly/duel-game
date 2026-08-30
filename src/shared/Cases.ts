@@ -22,6 +22,16 @@ export interface CaseDef {
 	// A "DisplayYaw" attribute on the Model wins over this value.
 }
 
+// Shared odds: every crate rolls the same rarity chances. What differs per crate
+// is which skins are eligible (see SkinDef.caseId in Catalog.ts).
+export const STANDARD_WEIGHTS: { [rarity: string]: number } = {
+	[Rarity.Common]: 50,
+	[Rarity.Rare]: 30,
+	[Rarity.Epic]: 15,
+	[Rarity.Legendary]: 4,
+	[Rarity.Mythic]: 1,
+};
+
 export const Cases = new Map<string, CaseDef>([
 	[
 		"GreenCase",
@@ -29,7 +39,7 @@ export const Cases = new Map<string, CaseDef>([
 			id: "GreenCase",
 			name: "Green Case",
 			price: 300,
-			weights: { [Rarity.Common]: 70, [Rarity.Rare]: 25, [Rarity.Epic]: 5 },
+			weights: STANDARD_WEIGHTS,
 			color: Color3.fromRGB(70, 175, 90),
 			modelName: "BaseCrate",
 		},
@@ -40,7 +50,7 @@ export const Cases = new Map<string, CaseDef>([
 			id: "BlueCase",
 			name: "Blue Case",
 			price: 600,
-			weights: { [Rarity.Common]: 40, [Rarity.Rare]: 40, [Rarity.Epic]: 15, [Rarity.Legendary]: 5 },
+			weights: STANDARD_WEIGHTS,
 			color: Color3.fromRGB(60, 130, 235),
 			modelName: "BlueCase",
 		},
@@ -51,7 +61,7 @@ export const Cases = new Map<string, CaseDef>([
 			id: "PurpleCase",
 			name: "Purple Case",
 			price: 1000,
-			weights: { [Rarity.Epic]: 45, [Rarity.Legendary]: 40, [Rarity.Mythic]: 15 },
+			weights: STANDARD_WEIGHTS,
 			color: Color3.fromRGB(150, 75, 220),
 			modelName: "PurpleCase",
 		},
@@ -62,7 +72,7 @@ export const Cases = new Map<string, CaseDef>([
 			id: "YellowCase",
 			name: "Yellow Case",
 			price: 1750,
-			weights: { [Rarity.Legendary]: 60, [Rarity.Mythic]: 40 },
+			weights: STANDARD_WEIGHTS,
 			color: Color3.fromRGB(240, 195, 55),
 			modelName: "YellowCase",
 		},
@@ -73,10 +83,10 @@ export const Cases = new Map<string, CaseDef>([
 			id: "RedCase",
 			name: "Red Case",
 			price: 3500,
-			weights: { [Rarity.Rare]: 35, [Rarity.Epic]: 40, [Rarity.Legendary]: 22, [Rarity.Mythic]: 3 },
+			weights: STANDARD_WEIGHTS,
 			color: Color3.fromRGB(215, 60, 60),
 			modelName: "RedCase",
-			animationName: "Mythic", // AnimSaves also holds an "Automatic Save" scratch take
+			animationName: "Mythic",
 		},
 	],
 ]);

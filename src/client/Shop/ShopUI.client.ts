@@ -8,12 +8,12 @@ import * as CratePresenter from "./CratePresenter";
 const player = Players.LocalPlayer;
 const gui = player.WaitForChild("PlayerGui").WaitForChild("MainScreen");
 const shop = gui.WaitForChild("MainFrame").WaitForChild("ShopGUI") as GuiObject;
-const container = shop.WaitForChild("Container");
+const container = shop.WaitForChild("Container") as ScrollingFrame;
 const cases = container.WaitForChild("Cases");
 const casesContainer = cases.WaitForChild("CasesContainer");
 const casesContainer2 = cases.WaitForChild("CasesContainer2");
 
-const productsTab = container.WaitForChild("Gamepasses");
+const productsTab = container.WaitForChild("Coins");
 const productsContainer = productsTab.WaitForChild("CoinsContainer");
 const productsContainer2 = productsTab.WaitForChild("CoinsContainer2");
 
@@ -147,6 +147,64 @@ const moneyBuyBtn = gui
 moneyBuyBtn.Activated.Connect(() => {
 	WindowManager.open("Shop");
 	shop.Visible = true;
+});
+
+// Logic for tab buttons
+const tabs = shop.FindFirstChild("TabButtons") as Frame;
+const casesTab = tabs.WaitForChild("Cases") as ImageButton;
+const coinsTab = tabs.WaitForChild("Coins") as ImageButton;
+const gamepassesTab = tabs.WaitForChild("Gamepasses") as ImageButton;
+const limitedsTab = tabs.WaitForChild("Limiteds") as ImageButton;
+
+const ACTIVE_TAB = "rbxassetid://76459582722455";
+const INACTIVE_TAB = "rbxassetid://118371499551965";
+
+let currentTab: ImageButton | undefined = undefined;
+
+function highlightTab(active: ImageButton) {
+	if (currentTab === active) return;
+	currentTab = active;
+
+	for (const b of tabs.GetChildren()) {
+		if (b.IsA("ImageButton")) {
+			if (b === active) {
+				b.Image = ACTIVE_TAB;
+				const title = b.FindFirstChild("Title") as TextLabel;
+				title.TextColor3 = new Color3(1, 1, 1);
+			} else {
+				b.Image = INACTIVE_TAB;
+				const title1 = b.FindFirstChild("Title") as TextLabel;
+				title1.TextColor3 = new Color3(0.45, 0.45, 0.45);
+			}
+		}
+	}
+}
+
+const tabScrollValues = {
+	cases: 185,
+	coins: 375,
+	gamepasses: 560,
+	limiteds: 0,
+};
+
+casesTab.MouseButton1Click.Connect(() => {
+	container.CanvasPosition = new Vector2(0, tabScrollValues.cases);
+	highlightTab(casesTab);
+});
+
+coinsTab.MouseButton1Click.Connect(() => {
+	container.CanvasPosition = new Vector2(0, tabScrollValues.coins);
+	highlightTab(coinsTab);
+});
+
+gamepassesTab.MouseButton1Click.Connect(() => {
+	container.CanvasPosition = new Vector2(0, tabScrollValues.gamepasses);
+	highlightTab(gamepassesTab);
+});
+
+limitedsTab.MouseButton1Click.Connect(() => {
+	container.CanvasPosition = new Vector2(0, tabScrollValues.limiteds);
+	highlightTab(limitedsTab);
 });
 
 export {};

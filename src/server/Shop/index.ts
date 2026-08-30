@@ -21,11 +21,12 @@ function rollRarity(weights: { [rarity: string]: number }): string {
 	return Rarity.Common; // fallback
 }
 
-// pick a random tradeable skin of the given rarity (defaults are tradeable:false excluded)
-function randomSkinOfRarity(rarity: string): string | undefined {
+// pick a random tradeable skin of the given rarity that belongs to this case
+// (defaults are tradeable:false excluded; skins not assigned a caseId can't drop from any crate)
+function randomSkinOfRarity(rarity: string, caseId: string): string | undefined {
 	const pool: string[] = [];
 	for (const [id, def] of Catalog) {
-		if (def.rarity === rarity && def.tradeable) pool.push(id);
+		if (def.rarity === rarity && def.tradeable && def.caseId === caseId) pool.push(id);
 	}
 	if (pool.size() === 0) return undefined;
 	return pool[math.random(0, pool.size() - 1)];
@@ -45,7 +46,7 @@ function handleOpen(player: Player, caseId: string) {
 	}
 
 	const rarity = rollRarity(def.weights);
-	const skinId = randomSkinOfRarity(rarity);
+	const skinId = randomSkinOfRarity(rarity, caseId);
 	if (skinId === undefined) {
 		CurrencyService.earn(player, def.price); // refund — no skin of that rarity exists
 		const payload: CaseResultPayload = { ok: false, caseId };
