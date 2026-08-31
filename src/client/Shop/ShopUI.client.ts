@@ -1,6 +1,7 @@
 import { MarketplaceService, Players, ReplicatedStorage, TextChatService } from "@rbxts/services";
 import { Cases } from "shared/Cases";
 import { CoinOffer, CoinProducts } from "shared/Monetization";
+import { GamepassOffer, Gamepasses, findGamepassByKey } from "shared/Gamepasses";
 import { CaseResultPayload } from "shared/types/Shop";
 import * as WindowManager from "../UI/WindowManager";
 import * as CratePresenter from "./CratePresenter";
@@ -17,11 +18,17 @@ const productsTab = container.WaitForChild("Coins");
 const productsContainer = productsTab.WaitForChild("CoinsContainer");
 const productsContainer2 = productsTab.WaitForChild("CoinsContainer2");
 
+const gamepassesContent = container.WaitForChild("Gamepasses");
+const gamepassesContainer1 = gamepassesContent.WaitForChild("GamepassesContainer1");
+const gamepassesContainer2 = gamepassesContent.WaitForChild("GamepassesContainer2");
+
 WindowManager.register("Shop", () => (shop.Visible = false));
 
 const remotes = ReplicatedStorage.WaitForChild("Remotes");
 const openCase = remotes.WaitForChild("OpenCase") as RemoteEvent;
 const caseResult = remotes.WaitForChild("CaseResult") as RemoteEvent;
+const gamepassUpdate = remotes.WaitForChild("GamepassUpdate") as RemoteEvent;
+const askForGamepasses = remotes.WaitForChild("AskForGamepasses") as RemoteFunction;
 
 function systemMessage(text: string) {
 	const channels = TextChatService.FindFirstChild("TextChannels");
@@ -99,6 +106,79 @@ function productParent(offer: CoinOffer): Instance {
 for (const offer of CoinProducts) {
 	wireOffer(productParent(offer), offer);
 }
+
+// Gamepasses ------------------------------------------------------------
+
+const ownedGamepasses = new Set<string>();
+
+function gamepassParent(gp: GamepassOffer): Instance {
+	return gp.container === "GamepassesContainer1" ? gamepassesContainer1 : gamepassesContainer2;
+}
+
+function gamepassFrame(gp: GamepassOffer): Instance | undefined {
+	return gamepassParent(gp).FindFirstChild(gp.key);
+}
+
+// Roblox already blocks a duplicate purchase server-side; this is just so the
+// button reads "OWNED" instead of prompting a purchase that'll get refused.
+function markOwned(key: string) {
+	ownedGamepasses.add(key);
+
+	const gp = findGamepassByKey(key);
+	if (gp === undefined) return;
+
+	const frame = gamepassFrame(gp);
+	const button = frame?.FindFirstChild("Button") as ImageButton | undefined;
+	const label = button?.FindFirstChild("TextLabel") as TextLabel | undefined;
+	if (label !== undefined) label.Text = "OWNED";
+	if (button !== undefined) button.Active = false;
+}
+
+function wireGamepass(gp: GamepassOffer) {
+	const frame = gamepassFrame(gp);
+	const button = frame?.FindFirstChild("Button") as ImageButton | undefined;
+	if (button === undefined) {
+		warn(`[Shop] no Button in gamepass frame "${gp.key}"`);
+		return;
+	}
+
+	button.Activated.Connect(() => {
+		print(`[Shop] clicked gamepass ${gp.key} (id ${gp.id})`);
+		if (gp.id === 0) {
+			systemMessage("This gamepass isn't set up yet — check back later.");
+			return;
+		}
+		if (ownedGamepasses.has(gp.key)) {
+			systemMessage(`You already own ${gp.name}.`);
+			return;
+		}
+		MarketplaceService.PromptGamePassPurchase(player, gp.id);
+	});
+	print(`[Shop] Wired gamepass ${gp.key} → id ${gp.id}`);
+}
+
+for (const gp of Gamepasses) wireGamepass(gp);
+
+const [gpOk, gpSnapshot] = pcall(() => askForGamepasses.InvokeServer() as { owned?: Record<string, boolean> });
+if (gpOk && gpSnapshot?.owned !== undefined) {
+	for (const [key, isOwned] of pairs(gpSnapshot.owned)) {
+		if (isOwned) markOwned(key as string);
+	}
+}
+
+gamepassUpdate.OnClientEvent.Connect((action: string, payload: unknown) => {
+	if (action === "Init") {
+		const owned = (payload as { owned?: Record<string, boolean> }).owned;
+		for (const [key, isOwned] of pairs(owned ?? {})) {
+			if (isOwned) markOwned(key as string);
+		}
+	} else if (action === "Own") {
+		const key = (payload as { key?: string }).key;
+		if (key === undefined) return;
+		markOwned(key);
+		systemMessage(`You unlocked ${findGamepassByKey(key)?.name ?? key}!`);
+	}
+});
 
 // server tells us what we got (or why it failed) as a chat message
 caseResult.OnClientEvent.Connect((text: string, payload?: CaseResultPayload) => {
