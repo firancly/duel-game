@@ -22,6 +22,11 @@ const gamepassesContent = container.WaitForChild("Gamepasses");
 const gamepassesContainer1 = gamepassesContent.WaitForChild("GamepassesContainer1");
 const gamepassesContainer2 = gamepassesContent.WaitForChild("GamepassesContainer2");
 
+const giftGui = shop.WaitForChild("GiftGUI") as ImageLabel;
+const serverPlayerScroll = giftGui.WaitForChild("ServerPlayerScroll") as ScrollingFrame;
+const giftPlayerTemplate = serverPlayerScroll.WaitForChild("Template") as ImageLabel;
+const giftSearchBox = giftGui.WaitForChild("SearchGui").WaitForChild("TextBox") as TextBox;
+
 WindowManager.register("Shop", () => (shop.Visible = false));
 
 const remotes = ReplicatedStorage.WaitForChild("Remotes");
@@ -29,6 +34,7 @@ const openCase = remotes.WaitForChild("OpenCase") as RemoteEvent;
 const caseResult = remotes.WaitForChild("CaseResult") as RemoteEvent;
 const gamepassUpdate = remotes.WaitForChild("GamepassUpdate") as RemoteEvent;
 const askForGamepasses = remotes.WaitForChild("AskForGamepasses") as RemoteFunction;
+const requestGift = remotes.WaitForChild("RequestGift") as RemoteFunction;
 
 function systemMessage(text: string) {
 	const channels = TextChatService.FindFirstChild("TextChannels");
@@ -178,6 +184,109 @@ gamepassUpdate.OnClientEvent.Connect((action: string, payload: unknown) => {
 		markOwned(key);
 		systemMessage(`You unlocked ${findGamepassByKey(key)?.name ?? key}!`);
 	}
+});
+
+// Gifting -----------------------------------------------------------------
+
+const giftProductIds = new Set<number>();
+for (const gp of Gamepasses) {
+	if (gp.giftProductId !== undefined && gp.giftProductId !== 0) giftProductIds.add(gp.giftProductId);
+}
+
+let currentGiftKey: string | undefined;
+
+function includesSubstring(haystack: string, needle: string): boolean {
+	if (needle === "") return true;
+	return haystack.lower().find(needle.lower(), 1, true)[0] !== undefined;
+}
+
+function avatarThumb(userId: number): string {
+	const [ok, url] = pcall(() =>
+		Players.GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100),
+	);
+	return ok ? (url as string) : "";
+}
+
+function giftFailureMessage(reason: string | undefined): string {
+	if (reason === "SELF") return "You can't gift yourself a gamepass.";
+	if (reason === "ALREADY_OWNS") return "That player already owns this gamepass.";
+	if (reason === "NOT_GIFTABLE") return "This gamepass isn't giftable yet — check back later.";
+	return "Couldn't send that gift right now.";
+}
+
+function sendGift(gp: GamepassOffer, target: Player) {
+	const [ok, result] = pcall(
+		() => requestGift.InvokeServer(target.UserId, gp.key) as { ok: boolean; reason?: string },
+	);
+	if (!ok || result === undefined) {
+		systemMessage("Couldn't reach the server — try again.");
+		return;
+	}
+	if (!result.ok) {
+		systemMessage(giftFailureMessage(result.reason));
+		return;
+	}
+
+	giftGui.Visible = false;
+	MarketplaceService.PromptProductPurchase(player, gp.giftProductId!);
+}
+
+function renderGiftList(gp: GamepassOffer, filter: string) {
+	for (const child of serverPlayerScroll.GetChildren()) {
+		if (child !== giftPlayerTemplate && child.IsA("GuiObject")) child.Destroy();
+	}
+	giftPlayerTemplate.Visible = false;
+
+	for (const target of Players.GetPlayers()) {
+		if (target === player) continue;
+		if (!includesSubstring(target.Name, filter) && !includesSubstring(target.DisplayName, filter)) continue;
+
+		const row = giftPlayerTemplate.Clone();
+		row.Name = tostring(target.UserId);
+		row.Visible = true;
+		row.Parent = serverPlayerScroll;
+
+		(row.FindFirstChild("DisplayName") as TextLabel).Text = target.DisplayName;
+		(row.FindFirstChild("Name") as TextLabel).Text = `@${target.Name}`;
+		(row.FindFirstChild("ImageLabel") as ImageLabel).Image = avatarThumb(target.UserId);
+
+		const giftButton = row.FindFirstChild("GiftButton") as ImageButton;
+		giftButton.Activated.Connect(() => sendGift(gp, target));
+	}
+}
+
+giftSearchBox.GetPropertyChangedSignal("Text").Connect(() => {
+	if (currentGiftKey === undefined) return;
+	const gp = findGamepassByKey(currentGiftKey);
+	if (gp !== undefined) renderGiftList(gp, giftSearchBox.Text);
+});
+
+function wireGiftButton(gp: GamepassOffer) {
+	const frame = gamepassFrame(gp);
+	const giftBtn = frame?.FindFirstChild("Gift") as ImageButton | undefined;
+	if (giftBtn === undefined) {
+		warn(`[Shop] no Gift button in gamepass frame "${gp.key}"`);
+		return;
+	}
+
+	giftBtn.Activated.Connect(() => {
+		if (gp.giftProductId === undefined || gp.giftProductId === 0) {
+			systemMessage("Gifting isn't set up for this gamepass yet — check back later.");
+			return;
+		}
+		currentGiftKey = gp.key;
+		giftSearchBox.Text = "";
+		renderGiftList(gp, "");
+		giftGui.Visible = true;
+	});
+}
+
+for (const gp of Gamepasses) wireGiftButton(gp);
+
+// buyer side confirmation once the Robux prompt resolves
+MarketplaceService.PromptProductPurchaseFinished.Connect((userId, productId, isPurchased) => {
+	if (userId !== player.UserId || !giftProductIds.has(productId)) return;
+	systemMessage(isPurchased ? "Gift sent!" : "Gift purchase cancelled.");
 });
 
 // server tells us what we got (or why it failed) as a chat message
