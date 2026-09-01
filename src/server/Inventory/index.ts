@@ -103,7 +103,7 @@ export function removeItem(player: Player, itemId: string) {
 	const state = getState(player);
 	if (state === undefined) return { success: false, reason: "NO_INVENTORY" };
 
-	const result = Operations.removeOne(state, itemId);
+	const result = Operations.remove(state, itemId);
 	if (result.success === true) {
 		Replicator.sendRemove(player, itemId, state.items[itemId]?.size() ?? 0);
 	}

@@ -43,24 +43,6 @@ export class Operations {
 		};
 	}
 
-	// TODO Used by admins to remove items from players inventories
-	// static remove(state: InventoryStateType, itemId: string): OperationResult {
-	// 	const uuids = state.itemsById.get(itemId);
-	// 	if (uuids === undefined || uuids.size() === 0) return { success: false, reason: "NO_ITEM_IN_INVENTORY" };
-
-	// 	const uuid = uuids[0];
-	// 	const item = state.items.get(uuid);
-
-	// 	state.items.delete(uuid);
-	// 	uuids.remove(0);
-	// 	if (uuids.size() === 0) state.itemsById.delete(itemId);
-
-	// 	return {
-	// 		success: true,
-	// 		changedItem: { uuid: item!.UUID, id: item!.id },
-	// 	};
-	// }
-
 	static equip(state: InventoryStateType, itemId: string): OperationResult {
 		// const uuids = state.itemsById.get(itemId);
 		// if (uuids === undefined || uuids.size() === 0) return { success: false, reason: "NO_ITEM_IN_INVENTORY" };
@@ -78,7 +60,7 @@ export class Operations {
 	}
 
 	// remove one copy of itemId if it was the last copy and equipped, revert to default
-	static removeOne(state: InventoryStateType, itemId: string): OperationResult {
+	static remove(state: InventoryStateType, itemId: string): OperationResult {
 		const items = state.items[itemId];
 		if (items === undefined || items.size() === 0) return { success: false, reason: "NOT_OWNED" };
 

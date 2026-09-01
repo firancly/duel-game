@@ -1,4 +1,4 @@
-import { Players } from "@rbxts/services";
+import { Players, RunService } from "@rbxts/services";
 import * as InventoryService from "./Inventory";
 import * as TradeService from "./Trade/TradeService";
 import * as CurrencyService from "./Currency";
@@ -15,6 +15,8 @@ GamepassService.init();
 
 // Setup chat commands
 Players.PlayerAdded.Connect((player) => {
+	if (RunService.IsStudio() === false) return;
+
 	player.Chatted.Connect((msg) => {
 		const parts = msg.split(" ");
 		const keyword = parts[0];
@@ -27,11 +29,10 @@ Players.PlayerAdded.Connect((player) => {
 			if (result.success === true) print(`added ${itemId}`);
 		}
 
-		// TODO
-		// if (keyword === "remove" && itemId !== "") {
-		// 	InventoryService.removeItem(player, itemId);
-		// 	print(`removed ${itemId}`);
-		// }
+		if (keyword === "remove" && itemId !== "") {
+			InventoryService.removeItem(player, itemId);
+			print(`removed ${itemId}`);
+		}
 
 		if (keyword === "equip" && itemId !== "") {
 			InventoryService.equipItem(player, itemId);
@@ -48,11 +49,6 @@ Players.PlayerAdded.Connect((player) => {
 		if (keyword === "spend" && itemId !== "") {
 			const n = tonumber(itemId);
 			if (n !== undefined) CurrencyService.spend(player, n);
-		}
-
-		if (keyword === "unequip" && itemId !== "") {
-			// InventoryService.unequipItem(player, itemId);
-			print(`unequipped ${itemId}`);
 		}
 	});
 });
