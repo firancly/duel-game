@@ -66,7 +66,7 @@ function wireCase(parent: Instance, name: string, caseId: string) {
 		// failsafe: never leave the buttons dead if the server goes quiet
 		task.delay(10, () => (requesting = false));
 	});
-	print(`[Shop] Wired ${name} → ${caseId}`);
+	// print(`[Shop] Wired ${name} → ${caseId}`);
 }
 
 wireCase(casesContainer, "GreenCase", "GreenCase");
@@ -106,7 +106,7 @@ function wireLimited(offer: LimitedOffer) {
 		}
 		MarketplaceService.PromptProductPurchase(player, offer.id);
 	});
-	print(`[Shop] Wired limited ${offer.key} → id ${offer.id}`);
+	// print(`[Shop] Wired limited ${offer.key} → id ${offer.id}`);
 }
 
 for (const offer of Limiteds) wireLimited(offer);
@@ -141,7 +141,7 @@ function wireOffer(parent: Instance, offer: CoinOffer) {
 		}
 		MarketplaceService.PromptProductPurchase(player, offer.id);
 	});
-	print(`[Shop] Wired product ${offer.button} → id ${offer.id}`);
+	// print(`[Shop] Wired product ${offer.button} → id ${offer.id}`);
 }
 
 function productParent(offer: CoinOffer): Instance {
@@ -199,7 +199,7 @@ function wireGamepass(gp: GamepassOffer) {
 		}
 		MarketplaceService.PromptGamePassPurchase(player, gp.id);
 	});
-	print(`[Shop] Wired gamepass ${gp.key} → id ${gp.id}`);
+	// print(`[Shop] Wired gamepass ${gp.key} → id ${gp.id}`);
 }
 
 for (const gp of Gamepasses) wireGamepass(gp);
@@ -328,7 +328,8 @@ function wireGamepassGiftButton(gp: GamepassOffer) {
 		openGiftGui({
 			label: "gamepass",
 			productId: gp.giftProductId,
-			requestIntent: (target) => requestGift.InvokeServer(target.UserId, gp.key) as { ok: boolean; reason?: string },
+			requestIntent: (target) =>
+				requestGift.InvokeServer(target.UserId, gp.key) as { ok: boolean; reason?: string },
 		});
 	});
 }

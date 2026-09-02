@@ -7,7 +7,15 @@ import { CoinActions } from "./replication/actions";
 const CurrencyStore = ProfileStore.New("PlayerCurrency", DEFAULT_PLAYER_CURRENCY_DATA);
 const wallets = new Map<Player, Profile<PlayerCurrencyData>>();
 
+// Fires (player, newBalance) on load and on every earn/spend/setBalance.
+// Legacy Luau listens to this to mirror the balance without knowing about ProfileStore.
+export const CoinsChanged = new Instance("BindableEvent");
+
 type Result = { success: true; balance: number } | { success: false; reason: string };
+
+function notifyChanged(player: Player, amount: number) {
+	CoinsChanged.Fire(player, amount);
+}
 
 function onPlayerAdded(player: Player) {
 	const wallet = CurrencyStore.StartSessionAsync(`${player.UserId}`, {
@@ -30,6 +38,7 @@ function onPlayerAdded(player: Player) {
 
 	wallets.set(player, wallet);
 	Replicator.sendInit(player, { player, amount: wallet.Data.coins });
+	notifyChanged(player, wallet.Data.coins);
 
 	print("[CurrencyService] Loaded wallet for:", player.Name);
 }
@@ -51,6 +60,7 @@ export function earn(player: Player, amount: number): Result {
 
 	profile.Data.coins += amount;
 	Replicator.sendEarn(player, profile.Data.coins);
+	notifyChanged(player, profile.Data.coins);
 	return { success: true, balance: profile.Data.coins };
 }
 
@@ -63,6 +73,7 @@ export function spend(player: Player, amount: number): Result {
 
 	profile.Data.coins -= amount;
 	Replicator.sendSpend(player, profile.Data.coins);
+	notifyChanged(player, profile.Data.coins);
 	return { success: true, balance: profile.Data.coins };
 }
 
@@ -73,7 +84,19 @@ export function setBalance(player: Player, amount: number): Result {
 
 	profile.Data.coins = math.max(0, amount);
 	Replicator.sendSet(player, profile.Data.coins);
+	notifyChanged(player, profile.Data.coins);
 	return { success: true, balance: profile.Data.coins };
+}
+
+// Yields until this player's wallet has finished loading, then returns the balance.
+// For legacy Luau to safely read a starting value regardless of PlayerAdded handler order.
+export function waitForBalance(player: Player): number {
+	if (wallets.has(player)) return getBalance(player);
+	while (!wallets.has(player) && player.Parent === Players) {
+		const p = CoinsChanged.Event.Wait() as unknown as Player; // Wait() returns (player, amount); only player is used
+		if (p === player) break;
+	}
+	return getBalance(player);
 }
 
 export function init() {

@@ -74,9 +74,6 @@ function processGiftReceipt(player: Player, receipt: ReceiptInfo): Enum.ProductP
 // recorded it just before this same product's purchase was prompted).
 function processLimitedReceipt(player: Player, receipt: ReceiptInfo): Enum.ProductPurchaseDecision | undefined {
 	const offer = findLimitedById(receipt.ProductId);
-	print(
-		`[Monetization][DEBUG] processLimitedReceipt: productId=${receipt.ProductId} -> offer=${offer?.key ?? "NONE"}`,
-	);
 	if (offer === undefined) return undefined; // not a limited bundle either
 
 	const intentKey = limitedGiftIntentKey(player.UserId, receipt.ProductId);
@@ -96,11 +93,7 @@ function processLimitedReceipt(player: Player, receipt: ReceiptInfo): Enum.Produ
 		}
 	}
 
-	print(`[Monetization][DEBUG] granting skinIds [${offer.skinIds.join(",")}] to ${recipient.Name}`);
-	for (const skinId of offer.skinIds) {
-		const result = InventoryService.addItem(recipient, skinId);
-		print(`[Monetization][DEBUG] addItem(${recipient.Name}, "${skinId}") ->`, result);
-	}
+	for (const skinId of offer.skinIds) InventoryService.addItem(recipient, skinId);
 
 	print(`[Monetization] ${player.Name} bought ${offer.name} for ${recipient.Name} (product ${receipt.ProductId})`);
 	return Enum.ProductPurchaseDecision.PurchaseGranted;

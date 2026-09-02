@@ -8,10 +8,8 @@ import * as InventoryService from "server/Inventory";
 const GamepassStore = ProfileStore.New("PlayerGamepasses", DEFAULT_PLAYER_GAMEPASS_DATA);
 const profiles = new Map<Player, Profile<PlayerGamepassData>>();
 
-// Roblox can't buy a GamePass on someone else's behalf, so gifting is our own dev-product
-// flow: client picks a recipient, we stash the intent here, THEN prompts the purchase.
-// ProcessReceipt (Shop/Monetization.ts) looks the intent up by (buyer, productId) to know
-// who to deliver to. Keyed as `${buyerUserId}_${productId}`; array = FIFO for rapid re-buys.
+export const GamepassGranted = new Instance("BindableEvent");
+
 interface GiftIntent {
 	recipientUserId: number;
 	key: string;
@@ -36,7 +34,7 @@ function verifyOwnership(player: Player, profile: Profile<PlayerGamepassData>) {
 		const [ok, owns] = pcall(() =>
 			MarketplaceService.UserOwnsGamePassAsync(player.UserId as unknown as User, gp.id),
 		);
-		if (ok && owns) profile.Data.owned[gp.key] = true;
+		if (ok && owns) grantOwnership(player, profile, gp.key);
 	}
 }
 
@@ -63,7 +61,7 @@ function onPlayerAdded(player: Player) {
 		player.Kick("Your data session ended. Rejoin to continue playing.");
 	});
 
-	// Gifts sent while this player was offline (or on another server) arrive here —
+	// Gifts sent while this player was offline (or on another server) arrive here
 	// ProfileStore replays any unprocessed message the moment a session starts.
 	profile.MessageHandler<GiftMessage>((message, processed) => {
 		if (message.type === "Gift" && typeIs(message.key, "string")) grantOwnership(player, profile, message.key);
@@ -78,21 +76,15 @@ function onPlayerAdded(player: Player) {
 }
 
 function grantOwnership(player: Player, profile: Profile<PlayerGamepassData>, key: string) {
-	print(
-		`[GamepassService][DEBUG] grantOwnership(${player.Name}, "${key}") already owned: ${profile.Data.owned[key]}`,
-	);
 	if (profile.Data.owned[key] === true) return; // already had it, nothing to replicate
 	profile.Data.owned[key] = true;
 	Replicator.sendOwn(player, key);
+	GamepassGranted.Fire(player, key);
 
 	// Some passes (e.g. SetClown, LimitedBundle) bundle a fixed skin set, grant it once, here,
 	// at the exact moment ownership flips false->true.
 	const gp = findGamepassByKey(key);
-	print(`[GamepassService][DEBUG] "${key}" skinIds: ${gp?.skinIds !== undefined ? gp.skinIds.join(",") : "NONE"}`);
-	for (const skinId of gp?.skinIds ?? []) {
-		const result = InventoryService.addItem(player, skinId);
-		print(`[GamepassService][DEBUG] addItem(${player.Name}, "${skinId}") ->`, result);
-	}
+	for (const skinId of gp?.skinIds ?? []) InventoryService.addItem(player, skinId);
 }
 
 function onPlayerRemoving(player: Player) {
@@ -101,18 +93,17 @@ function onPlayerRemoving(player: Player) {
 }
 
 function onPromptFinished(player: Player, gamePassId: number, wasPurchased: boolean) {
-	print(`[GamepassService][DEBUG] PromptGamePassPurchaseFinished(${player.Name}, ${gamePassId}, ${wasPurchased})`);
 	if (!wasPurchased) return;
 
 	const gp = findGamepassById(gamePassId);
 	if (gp === undefined) {
-		warn(`[GamepassService][DEBUG] no GamepassOffer with id ${gamePassId} — check shared/Gamepasses.ts`);
+		warn(`[GamepassService] no GamepassOffer with id ${gamePassId} — check shared/Gamepasses.ts`);
 		return;
 	}
 
 	const profile = profiles.get(player);
 	if (profile === undefined) {
-		warn(`[GamepassService][DEBUG] no loaded profile for ${player.Name} — can't grant ${gp.key}`);
+		warn(`[GamepassService] no loaded profile for ${player.Name} — can't grant ${gp.key}`);
 		return;
 	}
 
