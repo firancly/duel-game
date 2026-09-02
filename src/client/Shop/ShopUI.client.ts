@@ -226,9 +226,6 @@ gamepassUpdate.OnClientEvent.Connect((action: string, payload: unknown) => {
 });
 
 // Gifting -----------------------------------------------------------------
-// Shared by both Gamepasses (their own giftProductId — Roblox can't retarget who owns a
-// GamePass) and Limiteds (no separate product needed — gifting a bundle is just our own
-// InventoryService.addItem call server-side, so it reuses the bundle's regular Buy product).
 
 interface GiftSession {
 	label: string; // for failure/toast messages, e.g. "gamepass" or "bundle"

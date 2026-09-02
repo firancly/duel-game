@@ -9,6 +9,7 @@ export function set(player: Player, state: PresenceState) {
 }
 
 export function get(player: Player): PresenceState {
+	if (player.GetAttribute("InMatch") === true) return PresenceState.InMatch;
 	return states.get(player) ?? PresenceState.Lobby;
 }
 

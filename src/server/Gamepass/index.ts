@@ -10,6 +10,8 @@ const profiles = new Map<Player, Profile<PlayerGamepassData>>();
 
 export const GamepassGranted = new Instance("BindableEvent");
 
+const GamepassesLoaded = new Instance("BindableEvent");
+
 interface GiftIntent {
 	recipientUserId: number;
 	key: string;
@@ -71,6 +73,7 @@ function onPlayerAdded(player: Player) {
 	profiles.set(player, profile);
 	verifyOwnership(player, profile);
 	Replicator.sendInit(player, profile.Data);
+	GamepassesLoaded.Fire(player);
 
 	print("[GamepassService] Loaded gamepasses for:", player.Name);
 }
@@ -114,6 +117,19 @@ function onPromptFinished(player: Player, gamePassId: number, wasPurchased: bool
 // For perk checks elsewhere (2x earnings, VIP, etc.) once those are implemented.
 export function hasGamepass(player: Player, key: string): boolean {
 	return profiles.get(player)?.Data.owned[key] === true;
+}
+
+export function getOwnedGamepasses(player: Player): Readonly<Record<string, boolean>> | undefined {
+	return profiles.get(player)?.Data.owned;
+}
+
+export function waitForOwnedGamepasses(player: Player): Readonly<Record<string, boolean>> {
+	if (profiles.has(player)) return getOwnedGamepasses(player) ?? {};
+	while (!profiles.has(player) && player.Parent === Players) {
+		const p = GamepassesLoaded.Event.Wait() as unknown as Player; // Wait() returns (player); only player is used
+		if (p === player) break;
+	}
+	return getOwnedGamepasses(player) ?? {};
 }
 
 // True if `recipientUserId` already owns this pass — checks the live player's cache if

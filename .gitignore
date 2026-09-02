@@ -3,3 +3,4 @@
 /include
 *.tsbuildinfo
 /graphify-out
+sourcemap.json
