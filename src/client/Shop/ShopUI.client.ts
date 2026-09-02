@@ -28,6 +28,9 @@ const giftGui = shop.WaitForChild("GiftGUI") as ImageLabel;
 const serverPlayerScroll = giftGui.WaitForChild("ServerPlayerScroll") as ScrollingFrame;
 const giftPlayerTemplate = serverPlayerScroll.WaitForChild("Template") as ImageLabel;
 const giftSearchBox = giftGui.WaitForChild("SearchGui").WaitForChild("TextBox") as TextBox;
+const giftNameLabel = giftGui.WaitForChild("NameGamepass") as TextLabel;
+const giftPriceLabel = giftGui.WaitForChild("PriceGamepass") as TextLabel;
+const giftRobuxIcon = giftGui.WaitForChild("RobuxIcon") as ImageLabel;
 
 WindowManager.register("Shop", () => (shop.Visible = false));
 
@@ -229,6 +232,8 @@ gamepassUpdate.OnClientEvent.Connect((action: string, payload: unknown) => {
 
 interface GiftSession {
 	label: string; // for failure/toast messages, e.g. "gamepass" or "bundle"
+	name: string; // display name shown in GiftGUI
+	price: number; // Robux price shown in GiftGUI
 	productId: number; // PromptProductPurchase target once the intent is recorded
 	requestIntent: (target: Player) => { ok: boolean; reason?: string } | undefined;
 }
@@ -304,9 +309,24 @@ giftSearchBox.GetPropertyChangedSignal("Text").Connect(() => {
 
 function openGiftGui(session: GiftSession) {
 	currentGift = session;
+	giftNameLabel.Text = session.name;
+	giftPriceLabel.Text = `${session.price}`;
+	giftRobuxIcon.Visible = true;
 	giftSearchBox.Text = "";
 	renderGiftList("");
 	giftGui.Visible = true;
+}
+
+// live Robux price for a dev product, falling back to a known price if the lookup fails
+function robuxPrice(productId: number, fallback: number): number {
+	const [ok, info] = pcall(() => MarketplaceService.GetProductInfo(productId, Enum.InfoType.Product));
+	const price = ok ? (info as { PriceInRobux?: number }).PriceInRobux : undefined;
+	return price ?? fallback;
+}
+
+// gift price is always 10% off the base price
+function giftPrice(basePrice: number): number {
+	return math.floor(basePrice * 0.9);
 }
 
 function wireGamepassGiftButton(gp: GamepassOffer) {
@@ -324,6 +344,8 @@ function wireGamepassGiftButton(gp: GamepassOffer) {
 		}
 		openGiftGui({
 			label: "gamepass",
+			name: gp.name,
+			price: giftPrice(gp.price ?? 0),
 			productId: gp.giftProductId,
 			requestIntent: (target) =>
 				requestGift.InvokeServer(target.UserId, gp.key) as { ok: boolean; reason?: string },
@@ -348,6 +370,8 @@ function wireLimitedGiftButton(offer: LimitedOffer) {
 		}
 		openGiftGui({
 			label: "bundle",
+			name: offer.name,
+			price: robuxPrice(offer.id, 0),
 			productId: offer.id,
 			requestIntent: (target) =>
 				requestLimitedGift.InvokeServer(target.UserId, offer.key) as { ok: boolean; reason?: string },
