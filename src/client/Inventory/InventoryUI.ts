@@ -95,7 +95,7 @@ export function init(requestEquip: (id: string) => void) {
 	wireTab("KnifeButton", [WeaponSlot.Knife]);
 	const rifleBtn = wireTab("RifleButton", [WeaponSlot.Rifle]);
 	wireTab("GunButton", [WeaponSlot.Revolver]);
-	// OtherButton wire when that slot exists
+	wireTab("OtherButton", [WeaponSlot.DeathEffect]);
 
 	if (rifleBtn !== undefined) highlightTab(rifleBtn); // Rifle is the default tab
 
