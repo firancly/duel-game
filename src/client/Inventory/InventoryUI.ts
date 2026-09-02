@@ -15,7 +15,7 @@ const invGui = gui.WaitForChild("MainFrame").WaitForChild("InventoryGUI") as Ima
 const scroll = invGui.WaitForChild("InventoryScroll") as ScrollingFrame;
 const tabs = invGui.WaitForChild("ContainerButtons");
 
-const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"];
+const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Exclusive"];
 const templates = new Map<string, ImageLabel>();
 for (const name of RARITY_NAMES) {
 	const t = scroll.FindFirstChild(name) as ImageLabel | undefined;

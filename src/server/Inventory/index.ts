@@ -2,7 +2,7 @@ import { Players } from "@rbxts/services";
 import ProfileStore, { Profile } from "@rbxts/profile-store";
 import { InventoryStateType } from "./Data/InventoryState";
 import { Operations } from "./Operations/Operations";
-import { Catalog, DEFAULT_SKINS, getDef } from "shared/Catalog";
+import { Catalog, DEFAULT_SKINS, Rarity, getDef } from "shared/Catalog";
 import { Replicator } from "./Replication/replicator";
 import { Actions } from "./Replication/actions";
 
@@ -15,9 +15,6 @@ const inventories = new Map<Player, Profile<InventoryStateType>>();
 const died = new Set<Player>();
 
 function onPlayerAdded(player: Player) {
-	// DEV CONDITION: wipes stale profile before persistance so the next join looks like a fresh load.
-	if (player.UserId === 11170246) InventoryStore.RemoveAsync(`${player.UserId}`);
-
 	const inv = InventoryStore.StartSessionAsync(`${player.UserId}`, {
 		Cancel: () => player.Parent !== Players,
 	}) as Profile<InventoryStateType> | undefined;
@@ -31,6 +28,13 @@ function onPlayerAdded(player: Player) {
 	inv.Reconcile();
 	inv.AddUserId(player.UserId);
 
+	// DEV CONDITION: resets the inventory in-memory after the session is already live, so a dev
+	// rejoin looks like a fresh load — done post-session (not via RemoveAsync before
+	// StartSessionAsync, which races the removal against the session lock on the same key and
+	// can leave the profile unable to save after). A fresh object, never the shared
+	// DEFAULT_INVENTORY_DATA reference — that constant is reused across every player's Reconcile.
+	if (player.UserId === 11170246) inv.Data = { items: {}, equipped: {} };
+
 	inv.OnSessionEnd.Connect(() => {
 		inventories.delete(player);
 		died.delete(player);
@@ -39,8 +43,9 @@ function onPlayerAdded(player: Player) {
 
 	inventories.set(player, inv);
 
-	// Only grant starter skins on a new profile. SessionLoadCount is 1
-	if (inv.SessionLoadCount === 1) {
+	// Grant starter skins on a new profile (SessionLoadCount === 1), or every join for the dev
+	// id above since its inventory just got reset back to empty.
+	if (inv.SessionLoadCount === 1 || player.UserId === 11170246) {
 		for (const [slot, id] of DEFAULT_SKINS) {
 			const result = Operations.add(inv.Data, id); // creates a real ItemInstance w/ uuid
 			if (!result.success) {
@@ -50,13 +55,15 @@ function onPlayerAdded(player: Player) {
 			inv.Data.equipped[slot] = result.changedItem.id;
 		}
 
-		// TEMP for testing: give one of every non-default skin in the catalog
+		// TEMP for testing: give one of every non-default skin in the catalog — except Exclusive
+		// ones, which should only ever come from actually buying the gamepass/bundle that grants
+		// them, so this giveaway doesn't mask whether that grant is working.
 		if (player.UserId === 11170246) {
-			warn("Gave player all skins");
+			warn("Gave player all skins (except Exclusive — buy the pass/bundle to test those)");
 			const defaultIds = new Set<string>();
 			for (const [, id] of DEFAULT_SKINS) defaultIds.add(id);
-			for (const [id] of Catalog) {
-				if (!defaultIds.has(id)) Operations.add(inv.Data, id);
+			for (const [id, def] of Catalog) {
+				if (!defaultIds.has(id) && def.rarity !== Rarity.Exclusive) Operations.add(inv.Data, id);
 			}
 		}
 	}

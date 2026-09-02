@@ -1,6 +1,6 @@
 import { MarketplaceService, Players, ReplicatedStorage, TextChatService } from "@rbxts/services";
 import { Cases } from "shared/Cases";
-import { CoinOffer, CoinProducts } from "shared/Monetization";
+import { CoinOffer, CoinProducts, LimitedOffer, Limiteds } from "shared/Monetization";
 import { GamepassOffer, Gamepasses, findGamepassByKey } from "shared/Gamepasses";
 import { CaseResultPayload } from "shared/types/Shop";
 import * as WindowManager from "../UI/WindowManager";
@@ -17,6 +17,8 @@ const casesContainer2 = cases.WaitForChild("CasesContainer2");
 const productsTab = container.WaitForChild("Coins");
 const productsContainer = productsTab.WaitForChild("CoinsContainer");
 const productsContainer2 = productsTab.WaitForChild("CoinsContainer2");
+
+const limitedsContent = container.WaitForChild("Limiteds");
 
 const gamepassesContent = container.WaitForChild("Gamepasses");
 const gamepassesContainer1 = gamepassesContent.WaitForChild("GamepassesContainer1");
@@ -35,6 +37,7 @@ const caseResult = remotes.WaitForChild("CaseResult") as RemoteEvent;
 const gamepassUpdate = remotes.WaitForChild("GamepassUpdate") as RemoteEvent;
 const askForGamepasses = remotes.WaitForChild("AskForGamepasses") as RemoteFunction;
 const requestGift = remotes.WaitForChild("RequestGift") as RemoteFunction;
+const requestLimitedGift = remotes.WaitForChild("RequestLimitedGift") as RemoteFunction;
 
 function systemMessage(text: string) {
 	const channels = TextChatService.FindFirstChild("TextChannels");
@@ -71,6 +74,42 @@ wireCase(casesContainer, "BlueCase", "BlueCase");
 wireCase(casesContainer, "RedCase", "RedCase");
 wireCase(casesContainer, "PurpleCase", "PurpleCase");
 wireCase(casesContainer2, "YellowCase", "YellowCase");
+
+// Limiteds ----------------------------------------------------------------
+// One Developer Product grants a fixed skin set directly (no crate roll).
+
+function limitedFrame(offer: LimitedOffer): Instance | undefined {
+	const canvasGroup = limitedsContent.FindFirstChild("CanvasGroup");
+	return canvasGroup?.FindFirstChild(offer.key);
+}
+
+function wireLimited(offer: LimitedOffer) {
+	const frame = limitedFrame(offer);
+	const buyBtn = frame?.FindFirstChild("Buy") as ImageButton | undefined;
+	if (buyBtn === undefined) {
+		warn(`[Shop] no Buy button for limited "${offer.key}"`);
+		return;
+	}
+
+	const label = buyBtn.FindFirstChild("TextLabel") as TextLabel | undefined;
+	if (label !== undefined && offer.id !== 0) {
+		const [ok, info] = pcall(() => MarketplaceService.GetProductInfo(offer.id, Enum.InfoType.Product));
+		const price = ok ? (info as { PriceInRobux?: number }).PriceInRobux : undefined;
+		if (price !== undefined) label.Text = `R$${price}`;
+	}
+
+	buyBtn.Activated.Connect(() => {
+		print(`[Shop] clicked limited ${offer.key} (id ${offer.id})`);
+		if (offer.id === 0) {
+			systemMessage("This item isn't set up yet — check back later.");
+			return;
+		}
+		MarketplaceService.PromptProductPurchase(player, offer.id);
+	});
+	print(`[Shop] Wired limited ${offer.key} → id ${offer.id}`);
+}
+
+for (const offer of Limiteds) wireLimited(offer);
 
 function labelOffer(btn: Instance, offer: CoinOffer) {
 	const label = (btn.FindFirstChild("Price") ?? btn.FindFirstChild("Title")) as TextLabel | undefined;
@@ -187,13 +226,18 @@ gamepassUpdate.OnClientEvent.Connect((action: string, payload: unknown) => {
 });
 
 // Gifting -----------------------------------------------------------------
+// Shared by both Gamepasses (their own giftProductId — Roblox can't retarget who owns a
+// GamePass) and Limiteds (no separate product needed — gifting a bundle is just our own
+// InventoryService.addItem call server-side, so it reuses the bundle's regular Buy product).
 
-const giftProductIds = new Set<number>();
-for (const gp of Gamepasses) {
-	if (gp.giftProductId !== undefined && gp.giftProductId !== 0) giftProductIds.add(gp.giftProductId);
+interface GiftSession {
+	label: string; // for failure/toast messages, e.g. "gamepass" or "bundle"
+	productId: number; // PromptProductPurchase target once the intent is recorded
+	requestIntent: (target: Player) => { ok: boolean; reason?: string } | undefined;
 }
 
-let currentGiftKey: string | undefined;
+let currentGift: GiftSession | undefined;
+let pendingGiftProductId: number | undefined; // set right before prompting a gift purchase
 
 function includesSubstring(haystack: string, needle: string): boolean {
 	if (needle === "") return true;
@@ -207,31 +251,33 @@ function avatarThumb(userId: number): string {
 	return ok ? (url as string) : "";
 }
 
-function giftFailureMessage(reason: string | undefined): string {
-	if (reason === "SELF") return "You can't gift yourself a gamepass.";
-	if (reason === "ALREADY_OWNS") return "That player already owns this gamepass.";
-	if (reason === "NOT_GIFTABLE") return "This gamepass isn't giftable yet — check back later.";
+function giftFailureMessage(reason: string | undefined, label: string): string {
+	if (reason === "SELF") return `You can't gift yourself a ${label}.`;
+	if (reason === "ALREADY_OWNS") return `That player already owns this ${label}.`;
+	if (reason === "NOT_GIFTABLE") return `This ${label} isn't giftable yet — check back later.`;
 	return "Couldn't send that gift right now.";
 }
 
-function sendGift(gp: GamepassOffer, target: Player) {
-	const [ok, result] = pcall(
-		() => requestGift.InvokeServer(target.UserId, gp.key) as { ok: boolean; reason?: string },
-	);
+function sendGift(target: Player) {
+	const session = currentGift;
+	if (session === undefined) return;
+
+	const [ok, result] = pcall(() => session.requestIntent(target));
 	if (!ok || result === undefined) {
 		systemMessage("Couldn't reach the server — try again.");
 		return;
 	}
 	if (!result.ok) {
-		systemMessage(giftFailureMessage(result.reason));
+		systemMessage(giftFailureMessage(result.reason, session.label));
 		return;
 	}
 
 	giftGui.Visible = false;
-	MarketplaceService.PromptProductPurchase(player, gp.giftProductId!);
+	pendingGiftProductId = session.productId;
+	MarketplaceService.PromptProductPurchase(player, session.productId);
 }
 
-function renderGiftList(gp: GamepassOffer, filter: string) {
+function renderGiftList(filter: string) {
 	for (const child of serverPlayerScroll.GetChildren()) {
 		if (child !== giftPlayerTemplate && child.IsA("GuiObject")) child.Destroy();
 	}
@@ -251,17 +297,22 @@ function renderGiftList(gp: GamepassOffer, filter: string) {
 		(row.FindFirstChild("ImageLabel") as ImageLabel).Image = avatarThumb(target.UserId);
 
 		const giftButton = row.FindFirstChild("GiftButton") as ImageButton;
-		giftButton.Activated.Connect(() => sendGift(gp, target));
+		giftButton.Activated.Connect(() => sendGift(target));
 	}
 }
 
 giftSearchBox.GetPropertyChangedSignal("Text").Connect(() => {
-	if (currentGiftKey === undefined) return;
-	const gp = findGamepassByKey(currentGiftKey);
-	if (gp !== undefined) renderGiftList(gp, giftSearchBox.Text);
+	if (currentGift !== undefined) renderGiftList(giftSearchBox.Text);
 });
 
-function wireGiftButton(gp: GamepassOffer) {
+function openGiftGui(session: GiftSession) {
+	currentGift = session;
+	giftSearchBox.Text = "";
+	renderGiftList("");
+	giftGui.Visible = true;
+}
+
+function wireGamepassGiftButton(gp: GamepassOffer) {
 	const frame = gamepassFrame(gp);
 	const giftBtn = frame?.FindFirstChild("Gift") as ImageButton | undefined;
 	if (giftBtn === undefined) {
@@ -274,18 +325,45 @@ function wireGiftButton(gp: GamepassOffer) {
 			systemMessage("Gifting isn't set up for this gamepass yet — check back later.");
 			return;
 		}
-		currentGiftKey = gp.key;
-		giftSearchBox.Text = "";
-		renderGiftList(gp, "");
-		giftGui.Visible = true;
+		openGiftGui({
+			label: "gamepass",
+			productId: gp.giftProductId,
+			requestIntent: (target) => requestGift.InvokeServer(target.UserId, gp.key) as { ok: boolean; reason?: string },
+		});
 	});
 }
 
-for (const gp of Gamepasses) wireGiftButton(gp);
+for (const gp of Gamepasses) wireGamepassGiftButton(gp);
 
-// buyer side confirmation once the Robux prompt resolves
+function wireLimitedGiftButton(offer: LimitedOffer) {
+	const frame = limitedFrame(offer);
+	const giftBtn = frame?.FindFirstChild("Gift") as ImageButton | undefined;
+	if (giftBtn === undefined) {
+		warn(`[Shop] no Gift button for limited "${offer.key}"`);
+		return;
+	}
+
+	giftBtn.Activated.Connect(() => {
+		if (offer.id === 0) {
+			systemMessage("Gifting isn't set up for this item yet — check back later.");
+			return;
+		}
+		openGiftGui({
+			label: "bundle",
+			productId: offer.id,
+			requestIntent: (target) =>
+				requestLimitedGift.InvokeServer(target.UserId, offer.key) as { ok: boolean; reason?: string },
+		});
+	});
+}
+
+for (const offer of Limiteds) wireLimitedGiftButton(offer);
+
+// buyer-side confirmation once the Robux prompt resolves — only for a gift purchase we
+// ourselves just started (pendingGiftProductId), never a plain self-purchase of the same item
 MarketplaceService.PromptProductPurchaseFinished.Connect((userId, productId, isPurchased) => {
-	if (userId !== player.UserId || !giftProductIds.has(productId)) return;
+	if (userId !== player.UserId || productId !== pendingGiftProductId) return;
+	pendingGiftProductId = undefined;
 	systemMessage(isPurchased ? "Gift sent!" : "Gift purchase cancelled.");
 });
 
@@ -336,6 +414,23 @@ const moneyBuyBtn = gui
 moneyBuyBtn.Activated.Connect(() => {
 	WindowManager.open("Shop");
 	shop.Visible = true;
+	container.CanvasPosition = new Vector2(0, tabScrollValues.coins);
+	highlightTab(coinsTab);
+});
+
+// Menu -> Shop button (toggles open/closed on repeated clicks)
+const menuShopBtn = gui.WaitForChild("MainFrame").WaitForChild("Menu").WaitForChild("Shop") as ImageButton;
+menuShopBtn.Activated.Connect(() => {
+	if (shop.Visible) {
+		WindowManager.closed("Shop");
+		shop.Visible = false;
+		return;
+	}
+
+	WindowManager.open("Shop");
+	shop.Visible = true;
+	container.CanvasPosition = new Vector2(0, tabScrollValues.limiteds);
+	highlightTab(limitedsTab);
 });
 
 // Logic for tab buttons

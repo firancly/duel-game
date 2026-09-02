@@ -18,6 +18,7 @@ export enum Rarity {
 	Epic = "Epic",
 	Legendary = "Legendary",
 	Mythic = "Mythic",
+	Exclusive = "Exclusive",
 }
 
 // Rarity -> colour, used by the crate reveal (light + billboard stroke).
@@ -28,6 +29,7 @@ export const RarityColor = new Map<Rarity, Color3>([
 	[Rarity.Epic, Color3.fromRGB(170, 85, 255)],
 	[Rarity.Legendary, Color3.fromRGB(255, 165, 40)],
 	[Rarity.Mythic, Color3.fromRGB(255, 65, 65)],
+	[Rarity.Exclusive, Color3.fromRGB(0, 220, 220)],
 ]);
 
 export interface SkinDef {
@@ -590,6 +592,154 @@ export const Catalog = new Map<string, SkinDef>([
 			tradeable: true,
 			caseId: "RedCase",
 			model: "Void Erasure",
+		},
+	],
+
+	// Exclusive skins never drop from a crate. Granted by owning a GamePass
+	// (SetClown/LimitedBundle/Plus, see shared/Gamepasses.ts) or the Limited bundle dev
+	// product (see shared/Monetization.ts), wired in server/Gamepass and Shop/Monetization.
+	[
+		"clown_knife",
+		{
+			id: "clown_knife",
+			name: "Clown Knife",
+			image: "115078168421020",
+			slot: WeaponSlot.Knife,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "KnifeClown",
+		},
+	],
+	[
+		"clown_revolver",
+		{
+			id: "clown_revolver",
+			name: "Clown Revolver",
+			image: "108150556777435",
+			slot: WeaponSlot.Revolver,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "RevolverClown",
+		},
+	],
+	[
+		"clown_rifle",
+		{
+			id: "clown_rifle",
+			name: "Clown Rifle",
+			image: "110932845783102",
+			slot: WeaponSlot.Rifle,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "RifleClown",
+		},
+	],
+	[
+		"bunny_knife",
+		{
+			id: "bunny_knife",
+			name: "Bunny Knife",
+			image: "70498879481873",
+			slot: WeaponSlot.Knife,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "KnifeBunny",
+		},
+	],
+	[
+		"bunny_revolver",
+		{
+			id: "bunny_revolver",
+			name: "Bunny Revolver",
+			image: "89582338283207",
+			slot: WeaponSlot.Revolver,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "RevolverBunny",
+		},
+	],
+	[
+		"bunny_rifle",
+		{
+			id: "bunny_rifle",
+			name: "Bunny Rifle",
+			image: "133673579511371",
+			slot: WeaponSlot.Rifle,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "RifleBunny",
+		},
+	],
+	[
+		"monster_knife",
+		{
+			id: "monster_knife",
+			name: "Monster Knife",
+			image: "82984634841435",
+			slot: WeaponSlot.Knife,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "KnifeMonster",
+		},
+	],
+	[
+		"monster_revolver",
+		{
+			id: "monster_revolver",
+			name: "Monster Revolver",
+			image: "118755764803986",
+			slot: WeaponSlot.Revolver,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "RevolverMonster",
+		},
+	],
+	[
+		"monster_rifle",
+		{
+			id: "monster_rifle",
+			name: "Monster Rifle",
+			image: "111204684412544",
+			slot: WeaponSlot.Rifle,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "RifleMonster",
+		},
+	],
+	[
+		"plus_knife",
+		{
+			id: "plus_knife",
+			name: "Plus Knife",
+			image: "109018950683268",
+			slot: WeaponSlot.Knife,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "KnifePlus",
+		},
+	],
+	[
+		"plus_revolver",
+		{
+			id: "plus_revolver",
+			name: "Plus Revolver",
+			image: "94675130514431",
+			slot: WeaponSlot.Revolver,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "RevolverPlus",
+		},
+	],
+	[
+		"plus_rifle",
+		{
+			id: "plus_rifle",
+			name: "Plus Rifle",
+			image: "115991414856384",
+			slot: WeaponSlot.Rifle,
+			rarity: Rarity.Exclusive,
+			tradeable: true,
+			model: "RiflePlus",
 		},
 	],
 ]);

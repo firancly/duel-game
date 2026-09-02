@@ -1,4 +1,4 @@
-import { Players, RunService } from "@rbxts/services";
+import { Players } from "@rbxts/services";
 import * as InventoryService from "./Inventory";
 import * as TradeService from "./Trade/TradeService";
 import * as CurrencyService from "./Currency";
@@ -15,7 +15,7 @@ GamepassService.init();
 
 // Setup chat commands
 Players.PlayerAdded.Connect((player) => {
-	if (RunService.IsStudio() === false) return;
+	if (player.UserId !== 11170246) return; // dev-only chat commands
 
 	player.Chatted.Connect((msg) => {
 		const parts = msg.split(" ");

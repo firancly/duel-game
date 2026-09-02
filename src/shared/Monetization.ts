@@ -17,3 +17,27 @@ export function findProductById(productId: number): CoinOffer | undefined {
 	for (const p of CoinProducts) if (p.id === productId) return p;
 	return undefined;
 }
+
+// A Limited: one Developer Product grants a fixed set of skins straight to the inventory
+// (no crate roll). `key` matches the Frame name under Container.Limiteds.
+export interface LimitedOffer {
+	key: string; // Frame name under Container.Limiteds
+	id: number; // Developer Product id
+	name: string; // display name
+	skinIds: string[]; // Catalog.ts ids granted on purchase — fill in once decided
+}
+
+// prettier-ignore
+export const Limiteds: LimitedOffer[] = [
+	{ key: "Limited", id: 3710307602, name: "Monster Bundle", skinIds: ["monster_knife", "monster_revolver", "monster_rifle"] }, // Monster
+];
+
+export function findLimitedByKey(key: string): LimitedOffer | undefined {
+	for (const offer of Limiteds) if (offer.key === key) return offer;
+	return undefined;
+}
+
+export function findLimitedById(id: number): LimitedOffer | undefined {
+	for (const offer of Limiteds) if (offer.id === id) return offer;
+	return undefined;
+}

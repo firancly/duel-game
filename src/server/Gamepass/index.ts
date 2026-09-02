@@ -3,6 +3,7 @@ import ProfileStore, { Profile } from "@rbxts/profile-store";
 import { DEFAULT_PLAYER_GAMEPASS_DATA, PlayerGamepassData } from "./core/GamepassState";
 import { Gamepasses, findGamepassById, findGamepassByKey, findGamepassByGiftProductId } from "shared/Gamepasses";
 import { Replicator } from "./replication/replicator";
+import * as InventoryService from "server/Inventory";
 
 const GamepassStore = ProfileStore.New("PlayerGamepasses", DEFAULT_PLAYER_GAMEPASS_DATA);
 const profiles = new Map<Player, Profile<PlayerGamepassData>>();
@@ -53,6 +54,10 @@ function onPlayerAdded(player: Player) {
 	profile.Reconcile();
 	profile.AddUserId(player.UserId);
 
+	// DEV CONDITION: resets gamepass ownership in-memory after the session is already live, so
+	// a dev rejoin looks like a fresh load
+	if (player.UserId === 11170246) profile.Data.owned = {};
+
 	profile.OnSessionEnd.Connect(() => {
 		profiles.delete(player);
 		player.Kick("Your data session ended. Rejoin to continue playing.");
@@ -73,9 +78,21 @@ function onPlayerAdded(player: Player) {
 }
 
 function grantOwnership(player: Player, profile: Profile<PlayerGamepassData>, key: string) {
+	print(
+		`[GamepassService][DEBUG] grantOwnership(${player.Name}, "${key}") already owned: ${profile.Data.owned[key]}`,
+	);
 	if (profile.Data.owned[key] === true) return; // already had it, nothing to replicate
 	profile.Data.owned[key] = true;
 	Replicator.sendOwn(player, key);
+
+	// Some passes (e.g. SetClown, LimitedBundle) bundle a fixed skin set, grant it once, here,
+	// at the exact moment ownership flips false->true.
+	const gp = findGamepassByKey(key);
+	print(`[GamepassService][DEBUG] "${key}" skinIds: ${gp?.skinIds !== undefined ? gp.skinIds.join(",") : "NONE"}`);
+	for (const skinId of gp?.skinIds ?? []) {
+		const result = InventoryService.addItem(player, skinId);
+		print(`[GamepassService][DEBUG] addItem(${player.Name}, "${skinId}") ->`, result);
+	}
 }
 
 function onPlayerRemoving(player: Player) {
@@ -84,13 +101,20 @@ function onPlayerRemoving(player: Player) {
 }
 
 function onPromptFinished(player: Player, gamePassId: number, wasPurchased: boolean) {
+	print(`[GamepassService][DEBUG] PromptGamePassPurchaseFinished(${player.Name}, ${gamePassId}, ${wasPurchased})`);
 	if (!wasPurchased) return;
 
 	const gp = findGamepassById(gamePassId);
-	if (gp === undefined) return;
+	if (gp === undefined) {
+		warn(`[GamepassService][DEBUG] no GamepassOffer with id ${gamePassId} — check shared/Gamepasses.ts`);
+		return;
+	}
 
 	const profile = profiles.get(player);
-	if (profile === undefined) return;
+	if (profile === undefined) {
+		warn(`[GamepassService][DEBUG] no loaded profile for ${player.Name} — can't grant ${gp.key}`);
+		return;
+	}
 
 	grantOwnership(player, profile, gp.key);
 	print(`[GamepassService] ${player.Name} purchased ${gp.name}`);
