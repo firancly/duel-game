@@ -40,7 +40,7 @@ export interface SkinDef {
 	rarity: Rarity;
 	tradeable: boolean; // gate for the future trade system
 	model?: string; // child name under ReplicatedStorage/Assets/Weapons, for the crate reveal
-	caseId?: string; // which Cases.ts entry can drop this skin; undefined = not obtainable from a crate (e.g. defaults)
+	caseId?: string | string[]; // which Cases.ts entry(ies) can drop this skin; undefined = not obtainable from a crate (e.g. defaults)
 }
 
 // id -> definition. Add every new skin here.
@@ -145,7 +145,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Mythic,
 			tradeable: true,
-			caseId: "YellowCase",
+			caseId: ["YellowCase", "PlusCase"],
 			model: "ShadowReaper",
 		},
 	],
@@ -158,7 +158,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Mythic,
 			tradeable: true,
-			caseId: "YellowCase",
+			caseId: ["YellowCase", "PlusCase"],
 			model: "LavaBlade",
 		},
 	],
@@ -167,7 +167,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "knife_blood",
 			name: "Blood",
-			image: "", // TODO: image id
+			image: "rbxassetid://109744092152493",
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Mythic,
 			tradeable: true,
@@ -328,7 +328,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Rare,
 			tradeable: true,
-			caseId: "YellowCase",
+			caseId: ["YellowCase", "PlusCase"],
 			model: "VoidWalker",
 		},
 	],
@@ -341,7 +341,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Rare,
 			tradeable: true,
-			caseId: "YellowCase",
+			caseId: ["YellowCase", "PlusCase"],
 			model: "HellfireRevolver",
 		},
 	],
@@ -446,7 +446,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Rare,
 			tradeable: true,
-			caseId: "BlueCase",
+			caseId: ["BlueCase", "PlusCase"],
 			model: "ak47TactBlue",
 		},
 	],
@@ -485,7 +485,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Epic,
 			tradeable: true,
-			caseId: "PurpleCase",
+			caseId: ["PurpleCase", "PlusCase"],
 			model: "SilentStrikeSniper",
 		},
 	],
@@ -498,7 +498,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Epic,
 			tradeable: true,
-			caseId: "YellowCase",
+			caseId: ["YellowCase", "PlusCase"],
 			model: "VoidHarbingerAr",
 		},
 	],
@@ -511,7 +511,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Epic,
 			tradeable: true,
-			caseId: "YellowCase",
+			caseId: ["YellowCase", "PlusCase"],
 			model: "InfernoAr",
 		},
 	],
@@ -715,6 +715,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
+			caseId: "PlusCase",
 			model: "KnifePlus",
 		},
 	],
@@ -727,6 +728,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
+			caseId: "PlusCase",
 			model: "RevolverPlus",
 		},
 	],
@@ -739,6 +741,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
+			caseId: "PlusCase",
 			model: "RiflePlus",
 		},
 	],

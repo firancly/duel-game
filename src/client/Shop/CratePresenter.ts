@@ -138,6 +138,12 @@ function setCharacterHidden(hidden: boolean) {
 	}
 }
 
+// the nametag billboard would otherwise float in shot over the hidden character
+function setNameTagEnabled(enabled: boolean) {
+	const nameTag = player.Character?.FindFirstChild("Head")?.FindFirstChild("NameTagUI") as BillboardGui | undefined;
+	if (nameTag !== undefined) nameTag.Enabled = enabled;
+}
+
 // is the player's cursor/finger over the crate?
 function hitsCrate(screenPos: Vector3): boolean {
 	const cam = camera();
@@ -638,6 +644,7 @@ export function finish() {
 	savedJumpHeight = undefined;
 
 	setCharacterHidden(false);
+	setNameTagEnabled(true);
 	dragging = false;
 	unlockMouse();
 	stopAllEffects();
@@ -748,6 +755,7 @@ export function present(caseId: string, skinId: string, rarity: string | undefin
 	rayParams.FilterDescendantsInstances = [built.model];
 
 	setCharacterHidden(true);
+	setNameTagEnabled(false);
 
 	// freeze the player so they can't walk away from their own crate
 	const hum = humanoid();

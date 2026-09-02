@@ -3,6 +3,7 @@ import { Cases } from "shared/Cases";
 import { Catalog, getDef, Rarity } from "shared/Catalog";
 import * as CurrencyService from "server/Currency";
 import * as InventoryService from "server/Inventory";
+import * as GamepassService from "server/Gamepass";
 import { CaseResultPayload } from "shared/types/Shop";
 
 const openCase = remote("OpenCase", "RemoteEvent"); // C->S: caseId
@@ -21,12 +22,17 @@ function rollRarity(weights: { [rarity: string]: number }): string {
 	return Rarity.Common; // fallback
 }
 
+function belongsToCase(caseId: string, skinCaseId: string | string[] | undefined): boolean {
+	if (skinCaseId === undefined) return false;
+	return typeIs(skinCaseId, "string") ? skinCaseId === caseId : skinCaseId.includes(caseId);
+}
+
 // pick a random tradeable skin of the given rarity that belongs to this case
 // (defaults are tradeable:false excluded; skins not assigned a caseId can't drop from any crate)
 function randomSkinOfRarity(rarity: string, caseId: string): string | undefined {
 	const pool: string[] = [];
 	for (const [id, def] of Catalog) {
-		if (def.rarity === rarity && def.tradeable && def.caseId === caseId) pool.push(id);
+		if (def.rarity === rarity && def.tradeable && belongsToCase(caseId, def.caseId)) pool.push(id);
 	}
 	if (pool.size() === 0) return undefined;
 	return pool[math.random(0, pool.size() - 1)];
@@ -36,6 +42,12 @@ function randomSkinOfRarity(rarity: string, caseId: string): string | undefined 
 function handleOpen(player: Player, caseId: string) {
 	const def = Cases.get(caseId);
 	if (def === undefined) return;
+
+	if (def.requiredGamepass !== undefined && !GamepassService.hasGamepass(player, def.requiredGamepass)) {
+		const payload: CaseResultPayload = { ok: false, caseId };
+		caseResult.FireClient(player, `You need the ${def.requiredGamepass} gamepass to open ${def.name}.`, payload);
+		return;
+	}
 
 	// take the money first (server-authoritative; fails if broke)
 	const spent = CurrencyService.spend(player, def.price);

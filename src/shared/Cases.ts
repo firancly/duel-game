@@ -10,6 +10,7 @@ export interface CaseDef {
 	name: string;
 	price: number;
 	weights: { [rarity: string]: number };
+	requiredGamepass?: string; // Gamepasses.ts key, only owners can open this case
 
 	// Presentation:
 	color?: Color3; // tint for the procedurally built crate
@@ -18,7 +19,7 @@ export interface CaseDef {
 	// model's AnimSaves KeyframeSequence, which only registers reliably in Studio.
 	animationName?: string; // which take in AnimSaves to use, when the model holds several
 	displayYaw?: number; // degrees to turn the crate so its front faces the player. Rotating the
-	// model's RootPart in Studio does nothing — the presenter overwrites that CFrame every frame.
+	// model's RootPart in Studio does nothing the presenter overwrites that CFrame every frame.
 	// A "DisplayYaw" attribute on the Model wins over this value.
 }
 
@@ -30,6 +31,13 @@ export const STANDARD_WEIGHTS: { [rarity: string]: number } = {
 	[Rarity.Epic]: 15,
 	[Rarity.Legendary]: 4,
 	[Rarity.Mythic]: 1,
+};
+
+export const PLUS_CASE_WEIGHTS: { [rarity: string]: number } = {
+	[Rarity.Rare]: 40,
+	[Rarity.Epic]: 35,
+	[Rarity.Mythic]: 20,
+	[Rarity.Exclusive]: 5,
 };
 
 export const Cases = new Map<string, CaseDef>([
@@ -87,6 +95,18 @@ export const Cases = new Map<string, CaseDef>([
 			color: Color3.fromRGB(215, 60, 60),
 			modelName: "RedCase",
 			animationName: "Mythic",
+		},
+	],
+	[
+		"PlusCase",
+		{
+			id: "PlusCase",
+			name: "Plus Case",
+			price: 2000,
+			weights: PLUS_CASE_WEIGHTS,
+			requiredGamepass: "Plus",
+			color: Color3.fromRGB(255, 210, 60),
+			modelName: "PlusCase",
 		},
 	],
 ]);

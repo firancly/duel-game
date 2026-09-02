@@ -51,16 +51,31 @@ function systemMessage(text: string) {
 // one open at a time
 let requesting = false;
 
+// caseId -> Price label, for cases gated behind a gamepass (see refreshCaseLock)
+const gatedCasePriceLabels = new Map<string, TextLabel>();
+
 // wire a case button to its caseId
 function wireCase(parent: Instance, name: string, caseId: string) {
 	const btn = parent.FindFirstChild(name) as ImageButton | undefined;
 
 	const priceLabel = btn?.FindFirstChild("Price") as TextLabel | undefined;
 	const caseDef = Cases.get(caseId);
-	if (priceLabel !== undefined && caseDef !== undefined) priceLabel.Text = tostring(caseDef.price);
+	if (priceLabel !== undefined && caseDef !== undefined) {
+		if (caseDef.requiredGamepass !== undefined) {
+			priceLabel.Text = `${caseDef.requiredGamepass} Only`;
+			gatedCasePriceLabels.set(caseId, priceLabel);
+		} else {
+			priceLabel.Text = tostring(caseDef.price);
+		}
+	}
 
 	btn?.Activated.Connect(() => {
 		if (requesting || CratePresenter.isBusy()) return;
+
+		if (caseDef?.requiredGamepass !== undefined && !ownedGamepasses.has(caseDef.requiredGamepass)) {
+			systemMessage(`You need the ${caseDef.requiredGamepass} gamepass to open ${caseDef.name}.`);
+			return;
+		}
 
 		requesting = true;
 		openCase.FireServer(caseId);
@@ -72,11 +87,22 @@ function wireCase(parent: Instance, name: string, caseId: string) {
 	// print(`[Shop] Wired ${name} → ${caseId}`);
 }
 
+// flips a gated case's Price label from "<Gamepass> Only" to its real price once owned
+function refreshCaseLock(caseId: string) {
+	const caseDef = Cases.get(caseId);
+	const priceLabel = gatedCasePriceLabels.get(caseId);
+	if (caseDef === undefined || priceLabel === undefined || caseDef.requiredGamepass === undefined) return;
+	priceLabel.Text = ownedGamepasses.has(caseDef.requiredGamepass)
+		? tostring(caseDef.price)
+		: `${caseDef.requiredGamepass} Only`;
+}
+
 wireCase(casesContainer, "GreenCase", "GreenCase");
 wireCase(casesContainer, "BlueCase", "BlueCase");
 wireCase(casesContainer, "RedCase", "RedCase");
 wireCase(casesContainer, "PurpleCase", "PurpleCase");
 wireCase(casesContainer2, "YellowCase", "YellowCase");
+wireCase(casesContainer2, "PlusCase", "PlusCase");
 
 // Limiteds ----------------------------------------------------------------
 // One Developer Product grants a fixed skin set directly (no crate roll).
@@ -180,6 +206,11 @@ function markOwned(key: string) {
 	const label = button?.FindFirstChild("TextLabel") as TextLabel | undefined;
 	if (label !== undefined) label.Text = "OWNED";
 	if (button !== undefined) button.Active = false;
+
+	// unlock any case that requires this gamepass (e.g. PlusCase -> "Plus")
+	for (const [caseId, def] of Cases) {
+		if (def.requiredGamepass === key) refreshCaseLock(caseId);
+	}
 }
 
 function wireGamepass(gp: GamepassOffer) {
