@@ -522,7 +522,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "default_effect",
 			name: "Default Effect",
-			image: "",
+			image: "rbxassetid://71411711247358",
 			slot: WeaponSlot.DeathEffect,
 			rarity: Rarity.Common,
 			tradeable: true,
@@ -534,7 +534,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "energy_impact",
 			name: "Energy Impact",
-			image: "", // !!!!!!!!!!!!!!!!!!!!
+			image: "rbxassetid://112866346941643",
 			slot: WeaponSlot.DeathEffect,
 			rarity: Rarity.Rare,
 			tradeable: true,
@@ -547,7 +547,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "glitch_break",
 			name: "Glitch Break",
-			image: "", // !!!!!!!!!!!!!!!!!!!!
+			image: "rbxassetid://98945900813516",
 			slot: WeaponSlot.DeathEffect,
 			rarity: Rarity.Epic,
 			tradeable: true,
@@ -560,7 +560,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "energy_burst",
 			name: "Energy Burst",
-			image: "", // !!!!!!!!!!!!!!!!!!!!
+			image: "rbxassetid://78040790573378",
 			slot: WeaponSlot.DeathEffect,
 			rarity: Rarity.Legendary,
 			tradeable: true,
@@ -573,7 +573,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "inferno_collapse",
 			name: "Inferno Collapse ",
-			image: "", // !!!!!!!!!!!!!!!!!!!!
+			image: "rbxassetid://79027102371771",
 			slot: WeaponSlot.DeathEffect,
 			rarity: Rarity.Mythic,
 			tradeable: true,
@@ -586,7 +586,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "void_erasure",
 			name: "Void Erasure ",
-			image: "", // !!!!!!!!!!!!!!!!!!!!
+			image: "rbxassetid://109896768685726",
 			slot: WeaponSlot.DeathEffect,
 			rarity: Rarity.Mythic,
 			tradeable: true,

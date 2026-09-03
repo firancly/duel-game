@@ -25,11 +25,12 @@ export interface LimitedOffer {
 	id: number; // Developer Product id
 	name: string; // display name
 	skinIds: string[]; // Catalog.ts ids granted on purchase — fill in once decided
+	giftProductId?: number; // separate dev product for gifting this bundle, priced 10% under `id`
 }
 
 // prettier-ignore
 export const Limiteds: LimitedOffer[] = [
-	{ key: "Limited", id: 3710307602, name: "Monster Bundle", skinIds: ["monster_knife", "monster_revolver", "monster_rifle"] }, // Monster
+	{ key: "Limited", id: 3710307602, name: "Monster Bundle", skinIds: ["monster_knife", "monster_revolver", "monster_rifle"], giftProductId: 3711119580 }, // Monster
 ];
 
 export function findLimitedByKey(key: string): LimitedOffer | undefined {
@@ -39,5 +40,10 @@ export function findLimitedByKey(key: string): LimitedOffer | undefined {
 
 export function findLimitedById(id: number): LimitedOffer | undefined {
 	for (const offer of Limiteds) if (offer.id === id) return offer;
+	return undefined;
+}
+
+export function findLimitedByGiftProductId(productId: number): LimitedOffer | undefined {
+	for (const offer of Limiteds) if (offer.giftProductId === productId) return offer;
 	return undefined;
 }

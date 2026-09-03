@@ -50,6 +50,7 @@ export const Cases = new Map<string, CaseDef>([
 			weights: STANDARD_WEIGHTS,
 			color: Color3.fromRGB(70, 175, 90),
 			modelName: "BaseCrate",
+			animationId: "rbxassetid://76979230787849",
 		},
 	],
 	[
@@ -61,6 +62,7 @@ export const Cases = new Map<string, CaseDef>([
 			weights: STANDARD_WEIGHTS,
 			color: Color3.fromRGB(60, 130, 235),
 			modelName: "BlueCase",
+			animationId: "rbxassetid://93372038146365",
 		},
 	],
 	[
@@ -72,6 +74,7 @@ export const Cases = new Map<string, CaseDef>([
 			weights: STANDARD_WEIGHTS,
 			color: Color3.fromRGB(150, 75, 220),
 			modelName: "PurpleCase",
+			animationId: "rbxassetid://121691184616834",
 		},
 	],
 	[
@@ -83,6 +86,7 @@ export const Cases = new Map<string, CaseDef>([
 			weights: STANDARD_WEIGHTS,
 			color: Color3.fromRGB(240, 195, 55),
 			modelName: "YellowCase",
+			animationId: "rbxassetid://98328322984532",
 		},
 	],
 	[
@@ -94,7 +98,7 @@ export const Cases = new Map<string, CaseDef>([
 			weights: STANDARD_WEIGHTS,
 			color: Color3.fromRGB(215, 60, 60),
 			modelName: "RedCase",
-			animationName: "Mythic",
+			animationId: "rbxassetid://133525921658689",
 		},
 	],
 	[
@@ -107,6 +111,7 @@ export const Cases = new Map<string, CaseDef>([
 			requiredGamepass: "Plus",
 			color: Color3.fromRGB(255, 210, 60),
 			modelName: "PlusCase",
+			animationId: "rbxassetid://137625390937684",
 		},
 	],
 ]);

@@ -401,15 +401,15 @@ function wireLimitedGiftButton(offer: LimitedOffer) {
 	}
 
 	giftBtn.Activated.Connect(() => {
-		if (offer.id === 0) {
+		if (offer.giftProductId === undefined || offer.giftProductId === 0) {
 			systemMessage("Gifting isn't set up for this item yet — check back later.");
 			return;
 		}
 		openGiftGui({
 			label: "bundle",
 			name: offer.name,
-			price: robuxPrice(offer.id, 0),
-			productId: offer.id,
+			price: giftPrice(robuxPrice(offer.id, 0)),
+			productId: offer.giftProductId,
 			requestIntent: (target) =>
 				requestLimitedGift.InvokeServer(target.UserId, offer.key) as { ok: boolean; reason?: string },
 		});

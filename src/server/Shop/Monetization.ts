@@ -1,5 +1,12 @@
 import { MarketplaceService, Players } from "@rbxts/services";
-import { CoinProducts, Limiteds, findProductById, findLimitedById, findLimitedByKey } from "shared/Monetization";
+import {
+	CoinProducts,
+	Limiteds,
+	findProductById,
+	findLimitedById,
+	findLimitedByKey,
+	findLimitedByGiftProductId,
+} from "shared/Monetization";
 import { Gamepasses, findGamepassByGiftProductId } from "shared/Gamepasses";
 import { remote } from "shared/Remotes";
 import * as CurrencyService from "server/Currency";
@@ -8,16 +15,16 @@ import * as InventoryService from "server/Inventory";
 
 const processed = new Set<string>();
 
-// A Limited isn't a real GamePass — gifting it is just our own InventoryService.addItem call
-// for whoever the buyer picked, so it reuses the bundle's own Buy product id instead of a
-// separate gift product. Same pattern as server/Gamepass's pendingGifts, scoped to Limiteds.
+// A Limited gifted through its own `giftProductId` (priced 10% under the plain `id`) — buyer
+// pays that product, we deliver the bundle's skins to whoever they picked. Same pattern as
+// server/Gamepass's pendingGifts, scoped to Limiteds.
 interface LimitedGiftIntent {
 	recipientUserId: number;
 }
 const pendingLimitedGifts = new Map<string, LimitedGiftIntent[]>();
 
-function limitedGiftIntentKey(buyerUserId: number, productId: number): string {
-	return `${buyerUserId}_${productId}`;
+function limitedGiftIntentKey(buyerUserId: number, giftProductId: number): string {
+	return `${buyerUserId}_${giftProductId}`;
 }
 
 const requestLimitedGift = remote("RequestLimitedGift", "RemoteFunction");
@@ -29,10 +36,12 @@ function requestLimitedGiftHandler(
 	key: string,
 ): { ok: true } | { ok: false; reason: string } {
 	const offer = findLimitedByKey(key);
-	if (offer === undefined || offer.id === 0) return { ok: false, reason: "NOT_GIFTABLE" };
+	if (offer === undefined || offer.giftProductId === undefined || offer.giftProductId === 0) {
+		return { ok: false, reason: "NOT_GIFTABLE" };
+	}
 	if (recipientUserId === buyer.UserId) return { ok: false, reason: "SELF" };
 
-	const intentKey = limitedGiftIntentKey(buyer.UserId, offer.id);
+	const intentKey = limitedGiftIntentKey(buyer.UserId, offer.giftProductId);
 	const queue = pendingLimitedGifts.get(intentKey) ?? [];
 	queue.push({ recipientUserId });
 	pendingLimitedGifts.set(intentKey, queue);
@@ -69,12 +78,22 @@ function processGiftReceipt(player: Player, receipt: ReceiptInfo): Enum.ProductP
 	return Enum.ProductPurchaseDecision.PurchaseGranted;
 }
 
-// A limited bundle adds its fixed skin set straight to the inventory — either to the buyer
-// (plain purchase) or to whoever they picked in the gift UI (requestLimitedGiftHandler
-// recorded it just before this same product's purchase was prompted).
+// A limited bundle bought plain (not gifted) — adds its fixed skin set straight to the buyer.
 function processLimitedReceipt(player: Player, receipt: ReceiptInfo): Enum.ProductPurchaseDecision | undefined {
 	const offer = findLimitedById(receipt.ProductId);
 	if (offer === undefined) return undefined; // not a limited bundle either
+
+	for (const skinId of offer.skinIds) InventoryService.addItem(player, skinId);
+
+	print(`[Monetization] ${player.Name} bought ${offer.name} (product ${receipt.ProductId})`);
+	return Enum.ProductPurchaseDecision.PurchaseGranted;
+}
+
+// A limited bundle bought through its separate giftProductId — deliver to whoever the buyer
+// picked in the gift UI (requestLimitedGiftHandler recorded it just before this was prompted).
+function processLimitedGiftReceipt(player: Player, receipt: ReceiptInfo): Enum.ProductPurchaseDecision | undefined {
+	const offer = findLimitedByGiftProductId(receipt.ProductId);
+	if (offer === undefined) return undefined; // not a limited gift product either
 
 	const intentKey = limitedGiftIntentKey(player.UserId, receipt.ProductId);
 	const queue = pendingLimitedGifts.get(intentKey);
@@ -91,11 +110,14 @@ function processLimitedReceipt(player: Player, receipt: ReceiptInfo): Enum.Produ
 			// it to the buyer rather than let the purchase vanish.
 			warn(`[Monetization] gift recipient for ${offer.name} left the server — granting to buyer instead`);
 		}
+	} else {
+		// No recorded intent (e.g. bought straight off the product's page) — same fallback.
+		warn(`[Monetization] gift receipt for ${offer.name} with no pending intent — granting to buyer instead`);
 	}
 
 	for (const skinId of offer.skinIds) InventoryService.addItem(recipient, skinId);
 
-	print(`[Monetization] ${player.Name} bought ${offer.name} for ${recipient.Name} (product ${receipt.ProductId})`);
+	print(`[Monetization] ${player.Name} gifted ${offer.name} to ${recipient.Name} (product ${receipt.ProductId})`);
 	return Enum.ProductPurchaseDecision.PurchaseGranted;
 }
 
@@ -108,6 +130,7 @@ function processReceipt(receipt: ReceiptInfo): Enum.ProductPurchaseDecision {
 	const decision =
 		processCoinReceipt(player, receipt) ??
 		processGiftReceipt(player, receipt) ??
+		processLimitedGiftReceipt(player, receipt) ??
 		processLimitedReceipt(player, receipt);
 	if (decision === undefined) {
 		warn(`[Monetization] receipt for unknown product id ${receipt.ProductId} — check shared/Monetization.ts`);
@@ -128,6 +151,11 @@ export function init() {
 	}
 	if (Limiteds.some((offer) => offer.skinIds.size() === 0)) {
 		warn("[Monetization] shared/Monetization.ts has a Limited with no skinIds — buying it grants nothing.");
+	}
+	if (Limiteds.some((offer) => offer.giftProductId === undefined || offer.giftProductId === 0)) {
+		warn(
+			"[Monetization] shared/Monetization.ts has a Limited with no giftProductId — its Gift button won't work.",
+		);
 	}
 
 	MarketplaceService.ProcessReceipt = processReceipt;
