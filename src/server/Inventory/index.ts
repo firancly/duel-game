@@ -2,7 +2,7 @@ import { Players } from "@rbxts/services";
 import ProfileStore, { Profile } from "@rbxts/profile-store";
 import { InventoryStateType } from "./Data/InventoryState";
 import { Operations } from "./Operations/Operations";
-import { Catalog, DEFAULT_SKINS, Rarity, getDef } from "shared/Catalog";
+import { Catalog, DEFAULT_SKINS, Rarity, WeaponSlot, getDef } from "shared/Catalog";
 import { Replicator } from "./Replication/replicator";
 import { Actions } from "./Replication/actions";
 
@@ -13,6 +13,9 @@ const inventories = new Map<Player, Profile<InventoryStateType>>();
 // Fires (player, slot, itemId) on every successful equip. Luau listens to this to
 // keep a cosmetic on body display of the equipped skins live, in lobby and in match alike.
 export const EquipChanged = new Instance("BindableEvent");
+
+// Fires (player) once that player's inventory session has finished loading.
+const InventoryLoaded = new Instance("BindableEvent");
 
 // Per-session-only: did this life's character die yet? Not save data, so it
 // doesn't live on the profile — separate from persistence entirely.
@@ -74,9 +77,13 @@ function onPlayerAdded(player: Player) {
 
 	// Push the real (post-grant) snapshot once everything above has landed.
 	Replicator.sendInit(player, inv.Data);
+	InventoryLoaded.Fire(player);
 
 	player.CharacterAdded.Connect((character) => {
-		character.FindFirstChildWhichIsA("Humanoid")!.Died.Once(() => died.add(player));
+		character.FindFirstChildWhichIsA("Humanoid")!.Died.Once(() => {
+			died.add(player);
+			fireDeathEffect(character, inv);
+		});
 
 		if (died.has(player)) {
 			reloadClient(player);
@@ -96,6 +103,30 @@ export function onPlayerRemoving(player: Player) {
 
 export function getState(player: Player) {
 	return inventories.get(player)?.Data;
+}
+
+// Yields until this player's inventory has finished loading then returns their state
+// For Luau to safely read equipped skins right at spawn without racing the DataStore load
+export function waitForState(player: Player) {
+	if (inventories.has(player)) return getState(player);
+	while (!inventories.has(player) && player.Parent === Players) {
+		const p = InventoryLoaded.Event.Wait() as unknown as Player;
+		if (p === player) break;
+	}
+	return getState(player);
+}
+
+function fireDeathEffect(character: Model, inv: Profile<InventoryStateType>) {
+	const root = character.FindFirstChild("HumanoidRootPart") as BasePart | undefined;
+	if (root === undefined) return;
+
+	const equippedId = inv.Data.equipped[WeaponSlot.DeathEffect] ?? DEFAULT_SKINS.get(WeaponSlot.DeathEffect);
+	if (equippedId === undefined) return;
+
+	const def = getDef(equippedId);
+	if (def === undefined || def.model === undefined || def.model === "") return;
+
+	Replicator.sendDeathEffect(root.Position, def.model);
 }
 
 export function addItem(player: Player, itemId: string) {

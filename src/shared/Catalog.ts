@@ -526,7 +526,7 @@ export const Catalog = new Map<string, SkinDef>([
 			slot: WeaponSlot.DeathEffect,
 			rarity: Rarity.Common,
 			tradeable: true,
-			model: "",
+			model: "Simple Powder",
 		},
 	],
 	[

@@ -1,4 +1,10 @@
-import { MarketplaceService, Players, ReplicatedStorage, TextChatService } from "@rbxts/services";
+import {
+	MarketplaceService,
+	Players,
+	ProximityPromptService,
+	ReplicatedStorage,
+	TextChatService,
+} from "@rbxts/services";
 import { Cases } from "shared/Cases";
 import { CoinOffer, CoinProducts, LimitedOffer, Limiteds } from "shared/Monetization";
 import { GamepassOffer, Gamepasses, findGamepassByKey } from "shared/Gamepasses";
@@ -489,6 +495,28 @@ menuShopBtn.Activated.Connect(() => {
 	shop.Visible = true;
 	container.CanvasPosition = new Vector2(0, tabScrollValues.limiteds);
 	highlightTab(limitedsTab);
+});
+
+// Opens the shop scrolled to a given tab, respecting the trade block guard.
+function openShopTab(scroll: number, tab: ImageButton) {
+	if (shop.Visible) return;
+	if (!WindowManager.open("Shop")) {
+		systemMessage("Finish or cancel your trade first.");
+		return;
+	}
+	shop.Visible = true;
+	container.CanvasPosition = new Vector2(0, scroll);
+	highlightTab(tab);
+}
+
+const SHOP_PROMPTS: { [promptName: string]: () => void } = {
+	OpenShopPrompt: () => openShopTab(tabScrollValues.cases, casesTab), // ShopProximityPart
+	OpenBundlePrompt: () => openShopTab(tabScrollValues.limiteds, limitedsTab), // BundleProximityPart
+	OpenGamepassPrompt: () => openShopTab(tabScrollValues.gamepasses, gamepassesTab), // GamepassProximityPart
+};
+
+ProximityPromptService.PromptTriggered.Connect((prompt) => {
+	SHOP_PROMPTS[prompt.Name]?.();
 });
 
 // Logic for tab buttons

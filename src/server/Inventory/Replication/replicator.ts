@@ -50,4 +50,8 @@ export class Replicator {
 			if (typeIs(id, "string")) callback(player, id);
 		});
 	}
+
+	static sendDeathEffect(position: Vector3, model: string) {
+		deathEffect.FireAllClients(position, model);
+	}
 }
