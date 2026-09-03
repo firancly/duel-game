@@ -12,6 +12,9 @@ const askForInventory = remote("AskForInventory", "RemoteFunction");
 // client to server
 const requestEquip = remote("RequestEquip", "RemoteEvent");
 
+// server to all clients: a player died, play their equipped death effect at `position`
+const deathEffect = remote("DeathEffect", "RemoteEvent");
+
 // Send core
 export class Replicator {
 	static send(player: Player, action: InvAction, payload: unknown) {

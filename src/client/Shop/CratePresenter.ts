@@ -33,7 +33,6 @@ let onDone: (() => void) | undefined;
 
 let crate: Crate | undefined;
 let folder: Folder | undefined;
-let rayParams: RaycastParams | undefined;
 let connections: RBXScriptConnection[] = [];
 
 // camera / character state we borrowed and must hand back
@@ -50,7 +49,6 @@ let yaw = 0;
 let pitch = 0;
 let dragging = false;
 let dragDistance = 0;
-let pressedOnCrate = false;
 let punch = 0; // click recoil, decays to 0
 let clicks = 0;
 let lidLift = 0;
@@ -142,15 +140,6 @@ function setCharacterHidden(hidden: boolean) {
 function setNameTagEnabled(enabled: boolean) {
 	const nameTag = player.Character?.FindFirstChild("Head")?.FindFirstChild("NameTagUI") as BillboardGui | undefined;
 	if (nameTag !== undefined) nameTag.Enabled = enabled;
-}
-
-// is the player's cursor/finger over the crate?
-function hitsCrate(screenPos: Vector3): boolean {
-	const cam = camera();
-	if (cam === undefined || rayParams === undefined) return false;
-
-	const ray = cam.ViewportPointToRay(screenPos.X, screenPos.Y);
-	return Workspace.Raycast(ray.Origin, ray.Direction.mul(60), rayParams) !== undefined;
 }
 
 function registerClick() {
@@ -484,7 +473,6 @@ function onInputBegan(input: InputObject, gameProcessed: boolean) {
 	dragging = true;
 	dragDistance = 0;
 	lastPos = new Vector2(input.Position.X, input.Position.Y);
-	pressedOnCrate = hitsCrate(input.Position);
 
 	// A free mouse reports Delta as (0,0) — only a locked one gives real movement.
 	// Locking also means the drag never runs out of screen to travel across.
@@ -520,9 +508,8 @@ function onInputEnded(input: InputObject) {
 		return;
 	if (!dragging) return;
 
-	const wasClick = dragDistance < CLICK_SLOP && pressedOnCrate;
+	const wasClick = dragDistance < CLICK_SLOP;
 	dragging = false;
-	pressedOnCrate = false;
 	unlockMouse();
 
 	if (wasClick && state === "Presenting") registerClick();
@@ -665,7 +652,6 @@ export function finish() {
 	folder?.Destroy();
 	folder = undefined;
 	crate = undefined;
-	rayParams = undefined;
 	rewardWeapon = undefined;
 	rewardWeaponBase = undefined;
 	rewardWeaponSpin = false;
@@ -706,7 +692,6 @@ export function present(caseId: string, skinId: string, rarity: string | undefin
 	pitch = 0;
 	dragging = false;
 	dragDistance = 0;
-	pressedOnCrate = false;
 	punch = 0;
 	clicks = 0;
 	lidLift = 0;
@@ -749,10 +734,6 @@ export function present(caseId: string, skinId: string, rarity: string | undefin
 	}
 
 	buildVfxSchedule();
-
-	rayParams = new RaycastParams();
-	rayParams.FilterType = Enum.RaycastFilterType.Include;
-	rayParams.FilterDescendantsInstances = [built.model];
 
 	setCharacterHidden(true);
 	setNameTagEnabled(false);

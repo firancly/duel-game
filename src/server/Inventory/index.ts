@@ -10,6 +10,10 @@ const DEFAULT_INVENTORY_DATA: InventoryStateType = { items: {}, equipped: {} };
 const InventoryStore = ProfileStore.New("PlayerInventory", DEFAULT_INVENTORY_DATA);
 const inventories = new Map<Player, Profile<InventoryStateType>>();
 
+// Fires (player, slot, itemId) on every successful equip. Luau listens to this to
+// keep a cosmetic on body display of the equipped skins live, in lobby and in match alike.
+export const EquipChanged = new Instance("BindableEvent");
+
 // Per-session-only: did this life's character die yet? Not save data, so it
 // doesn't live on the profile — separate from persistence entirely.
 const died = new Set<Player>();
@@ -125,6 +129,7 @@ export function equipItem(player: Player, itemId: string) {
 	if (result.success === true) {
 		const def = getDef(itemId)!;
 		Replicator.sendEquip(player, def.slot, itemId);
+		EquipChanged.Fire(player, def.slot, itemId);
 	}
 
 	return result;
