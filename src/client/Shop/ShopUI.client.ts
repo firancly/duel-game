@@ -429,12 +429,10 @@ caseResult.OnClientEvent.Connect((text: string, payload?: CaseResultPayload) => 
 
 	shop.Visible = false;
 	const started = CratePresenter.present(payload.caseId, payload.skinId, payload.rarity, () => {
-		WindowManager.open("Shop");
-		shop.Visible = true;
+		shop.Visible = WindowManager.open("Shop");
 	});
 	if (!started) {
-		WindowManager.open("Shop");
-		shop.Visible = true; // presenter refused put the shop back
+		shop.Visible = WindowManager.open("Shop"); // presenter refused, put the shop back
 		systemMessage(`Error: the ${payload.caseId} crate does not exist.`);
 	}
 });
@@ -445,8 +443,9 @@ player.Chatted.Connect((msg) => {
 		if (shop.Visible) {
 			WindowManager.closed("Shop");
 			shop.Visible = false;
+		} else if (!WindowManager.open("Shop")) {
+			systemMessage("Finish or cancel your trade first.");
 		} else {
-			WindowManager.open("Shop");
 			shop.Visible = true;
 		}
 	}
@@ -465,7 +464,10 @@ const moneyBuyBtn = gui
 	.WaitForChild("MoneyBackground")
 	.WaitForChild("BuyButton") as ImageButton;
 moneyBuyBtn.Activated.Connect(() => {
-	WindowManager.open("Shop");
+	if (!WindowManager.open("Shop")) {
+		systemMessage("Finish or cancel your trade first.");
+		return;
+	}
 	shop.Visible = true;
 	container.CanvasPosition = new Vector2(0, tabScrollValues.coins);
 	highlightTab(coinsTab);
@@ -480,7 +482,10 @@ menuShopBtn.Activated.Connect(() => {
 		return;
 	}
 
-	WindowManager.open("Shop");
+	if (!WindowManager.open("Shop")) {
+		systemMessage("Finish or cancel your trade first.");
+		return;
+	}
 	shop.Visible = true;
 	container.CanvasPosition = new Vector2(0, tabScrollValues.limiteds);
 	highlightTab(limitedsTab);

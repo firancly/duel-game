@@ -1,4 +1,4 @@
-import { Players } from "@rbxts/services";
+import { Players, TextChatService } from "@rbxts/services";
 import { getDef, WeaponSlot } from "shared/Catalog";
 import * as WindowManager from "../UI/WindowManager";
 import { Store } from "./Store";
@@ -14,6 +14,12 @@ const gui = Players.LocalPlayer.WaitForChild("PlayerGui").WaitForChild("MainScre
 const invGui = gui.WaitForChild("MainFrame").WaitForChild("InventoryGUI") as ImageLabel;
 const scroll = invGui.WaitForChild("InventoryScroll") as ScrollingFrame;
 const tabs = invGui.WaitForChild("ContainerButtons");
+
+function systemMessage(text: string) {
+	const channels = TextChatService.FindFirstChild("TextChannels");
+	const general = channels?.FindFirstChild("RBXGeneral") as TextChannel | undefined;
+	general?.DisplaySystemMessage(text);
+}
 
 const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Exclusive"];
 const templates = new Map<string, ImageLabel>();
@@ -111,8 +117,9 @@ inventoryBtn.MouseButton1Click.Connect(() => {
 	if (invGui.Visible) {
 		WindowManager.closed("Inventory");
 		invGui.Visible = false;
+	} else if (!WindowManager.open("Inventory")) {
+		systemMessage("Finish or cancel your trade first.");
 	} else {
-		WindowManager.open("Inventory");
 		invGui.Visible = true;
 	}
 });

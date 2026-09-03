@@ -25,6 +25,11 @@ const theirScroll = tradeSecond.WaitForChild("BackgroundTheirOffer").WaitForChil
 const theirTemplate = theirScroll.WaitForChild("ImageLabel") as ImageButton;
 const inventoryScroll = tradeSecond.WaitForChild("YouInventory").WaitForChild("ScrollingFrame") as ScrollingFrame;
 const inventoryTemplate = inventoryScroll.WaitForChild("ImageLabel") as ImageButton;
+const youReadyLabel = upParts.WaitForChild("YouReady") as TextLabel;
+const theirReadyLabel = upParts.WaitForChild("TheirReady") as TextLabel;
+// grow the canvas with however many items get cloned in, instead of clipping past a fixed size
+for (const s of [offerScroll, theirScroll, inventoryScroll]) s.AutomaticCanvasSize = Enum.AutomaticSize.X;
+
 const offerCount = tradeSecond.WaitForChild("BackgroundOffer").WaitForChild("Count") as TextLabel;
 const theirCount = tradeSecond.WaitForChild("BackgroundTheirOffer").WaitForChild("Count") as TextLabel;
 const acceptButton = tradeSecond.WaitForChild("AcceptTrade") as ImageButton;
@@ -149,6 +154,11 @@ WindowManager.register("Trade", () => {
 
 let listOpen = false;
 (menu.WaitForChild("Trades") as ImageButton).Activated.Connect(() => {
+	if (!listOpen && WindowManager.isBlocked()) {
+		systemMessage("Finish or cancel your trade first.");
+		return;
+	}
+
 	listOpen = !listOpen;
 	if (listOpen) {
 		WindowManager.open("Trade");
@@ -311,12 +321,20 @@ acceptButton.Activated.Connect(() => {
 
 cancelButton.Activated.Connect(() => cancelTrade.FireServer());
 
-tradeConfirmed.OnClientEvent.Connect(() => systemMessage("The other player accepted the trade."));
+const READY_COLOR = Color3.fromRGB(46, 222, 41);
+const NOT_READY_COLOR = Color3.fromRGB(204, 23, 23);
+
+// personalized: (youReady, theirReady) from this viewer's side
+tradeConfirmed.OnClientEvent.Connect((youReady: boolean, theirReady: boolean) => {
+	youReadyLabel.TextColor3 = youReady ? READY_COLOR : NOT_READY_COLOR;
+	theirReadyLabel.TextColor3 = theirReady ? READY_COLOR : NOT_READY_COLOR;
+});
 
 // server drives the state label: "Waiting" or the 10-to-0 countdown
 tradeState.OnClientEvent.Connect((text: string) => (tradeStateLabel.Text = text));
 
 tradeComplete.OnClientEvent.Connect((success: boolean) => {
+	WindowManager.setBlocked(false); // free to open other windows again
 	WindowManager.closed("Trade");
 	tradeSecond.Visible = false;
 	offer.clear();
@@ -329,11 +347,14 @@ function resetOffer() {
 	renderAll(); // draw inventory + empty offer (updates your Count)
 	clearEntries(theirScroll, theirTemplate);
 	theirCount.Text = `0/${MAX_OFFER}`;
+	youReadyLabel.TextColor3 = NOT_READY_COLOR;
+	theirReadyLabel.TextColor3 = NOT_READY_COLOR;
 	syncOffer(); // clear the other side's view too
 }
 
 tradeStarted.OnClientEvent.Connect((otherUserId: number, otherDisplayName: string) => {
 	WindowManager.open("Trade"); // covers accepting an invite while the list was never opened
+	WindowManager.setBlocked(true); // pinned — no Shop/Inventory until this trade ends
 	tradeGui.Visible = false;
 	listOpen = false;
 

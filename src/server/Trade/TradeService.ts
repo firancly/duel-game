@@ -95,6 +95,7 @@ function startTrade(a: Player, b: Player) {
 	tradeStarted.FireClient(a, b.UserId, b.DisplayName);
 	tradeStarted.FireClient(b, a.UserId, a.DisplayName);
 	setState(session, "Waiting");
+	broadcastReady(session);
 	print(`[Trade] started ${a.Name} <-> ${b.Name}`);
 }
 
@@ -133,6 +134,7 @@ function handleOfferUpdate(player: Player, offerRecord: unknown) {
 	session.confirmedB = false;
 	session.countdownToken += 1;
 	setState(session, "Waiting");
+	broadcastReady(session);
 
 	// show it on the OTHER player's screen (their "their offer" panel)
 	const other = isA ? session.b : session.a;
@@ -188,6 +190,12 @@ function setState(session: TradeSession, text: string) {
 	tradeState.FireClient(session.b, text);
 }
 
+// push each side's ready state, personalized so "youReady"/"theirReady" line up per viewer
+function broadcastReady(session: TradeSession) {
+	tradeConfirmed.FireClient(session.a, session.confirmedA, session.confirmedB);
+	tradeConfirmed.FireClient(session.b, session.confirmedB, session.confirmedA);
+}
+
 // both accepted, 10s countdown then swap. cancels itself if anything changes.
 function startCountdown(session: TradeSession) {
 	session.countdownToken += 1;
@@ -214,6 +222,7 @@ function handleConfirm(player: Player) {
 	const isA = session.a === player;
 	if (isA) session.confirmedA = true;
 	else session.confirmedB = true;
+	broadcastReady(session);
 
 	// both in, start the countdown; otherwise still waiting
 	if (session.confirmedA && session.confirmedB) startCountdown(session);
