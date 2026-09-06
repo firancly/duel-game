@@ -157,7 +157,7 @@ Used it for debugging and looking up Roblox API specifics, and for putting toget
 
 ## Video demo
 
-https://github.com/user-attachments/assets/a5237e4f-1cca-43d1-89da-853a3781ec80
+https://streamable.com/hknw34
 
 ## Play it
 
