@@ -1,72 +1,173 @@
-# Duel Game Skin Inventory
+<a id="readme-top"></a>
 
-Cosmetic skin inventory for a Murderer vs Sheriff / Rivals style Roblox game. Written in [roblox-ts](https://roblox-ts.com/).
+# Duel Game
 
-Everyone spawns with the same three weapons: a Rifle, a Revolver, and a Knife. You don't own or equip the weapons, they're equiped when you join a match. What you actually collect and equip is **skins**, one per weapon. So this whole thing is really a skin locker, not a bag of items.
+Murderer vs Sheriff / Rivals style Roblox game, written in [roblox-ts](https://roblox-ts.com/). Started out as just a skin inventory I built to learn how that kind of system works, and it's slowly turned into a whole little economy: a shop, loot crates, gamepasses, gifting, trading between players, coins, the works.
 
-I built it as a learning project. Learnt inventory systems to see how those are structured, then kept the good architectural ideas (server owns everything, delta replication) and threw out the parts a cosmetic game doesn't need.
+[Play it](#play-it) · [Watch the demo](#video-demo) · [Questions? Slack me](#questions)
 
-## Layout
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li><a href="#about-the-project">About the project</a></li>
+    <li><a href="#built-with">Built with</a></li>
+    <li><a href="#how-it-fits-together">How it fits together</a></li>
+    <li>
+      <a href="#whats-actually-in-here">What's actually in here</a>
+      <ul>
+        <li><a href="#skins-and-inventory">Skins and inventory</a></li>
+        <li><a href="#shop-crates-gamepasses-and-limiteds">Shop, crates, gamepasses, limiteds</a></li>
+        <li><a href="#gifting">Gifting</a></li>
+        <li><a href="#trading">Trading</a></li>
+        <li><a href="#currency">Currency</a></li>
+        <li><a href="#death-effects">Death effects</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting started</a>
+      <ul>
+        <li><a href="#youll-need">You'll need</a></li>
+        <li><a href="#running-it">Running it</a></li>
+      </ul>
+    </li>
+    <li><a href="#testing-it">Testing it</a></li>
+    <li><a href="#the-old-weight-system">The old weight system</a></li>
+    <li><a href="#ai-usage">AI usage</a></li>
+    <li><a href="#video-demo">Video demo</a></li>
+    <li><a href="#questions">Questions</a></li>
+  </ol>
+</details>
 
-SERVER - owns who has what and what's equipped
-|.             ^
-|.             |
-v.             |
-delta event   request
-|.             ^
-v.             |
-CLIENT - mirror the data and draw ui
+## About the project
 
-both import `Catalog.ts` for the (skin defs(
+Every player spawns with the same three weapons, a rifle, a revolver, a knife. You don't unlock or buy the weapons themselves, they're just always there. What you're actually collecting is skins for them, one equipped per slot, plus a death effect that plays wherever you die.
 
-## Note to the reviewers
-I apologize for the previous re-ship not containing new information, I fixed it in a rush before leaving and forgot to commit on my PC. Currently I am on the way to Singapore and wrote updates on my mobile phone. I hope if there are any issues the next commit doesn't result in a permanent rejection as I am boarding the plane as of writing this readme. 
+I built the inventory part of this first, mostly to learn how inventory systems are usually put together. Read up on how survival/RPG games structure theirs, kept the ideas that made sense here (the server owns everything, the client just gets told what changed), and dropped the rest since a cosmetic game doesn't need stacking or weight limits or any of that. Once that foundation existed it was pretty easy to keep building on it, and now there's a shop, crates, gamepasses, gifting, and trading sitting on top.
 
-> This section will be removed once it leaves the review process. Feel free to ask me any questions regarding the game on slack. username: firancly slack-id: U0BDBQL1PNV.
+Nowhere near done, but it plays.
 
-### Try out the game here:
-https://www.roblox.com/share?code=cf00c0718e1b2840898ebba9c61ac727&type=ExperienceDetails&stamp=1785460113999
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## A few decisions worth knowing
+## Built with
 
-**Catalog holds all the config stuff.** Name, image, rarity, which slot a skin goes on. It lives in `shared/Catalog.ts`, keyed by `id`. An owned item is just `{ id, uuid }`, and anything else about it gets looked up from the catalog. That way a skin's image lives in exactly one place, and I never send images over the network since the client already has the catalog.
+- [roblox-ts](https://roblox-ts.com/) - writing this in TypeScript instead of raw Luau
+- [@rbxts/profile-store](https://github.com/MadStudioRoblox/ProfileStore) - handles the DataStore side, saving on leave, and delivering gifts to players who are offline when they're sent
+- [Rojo](https://rojo.space/) - syncs everything into Studio
+- ESLint + Prettier, with the roblox-ts plugin
 
-**Everything runs on `id`. The `uuid` is just along for the ride.** Add, remove, equip all take an `id`. Each copy still gets a `uuid` so trading can point at one specific copy later (and so you can't dupe), but nothing uses it yet.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-**Updates are deltas, not full resyncs.** One RemoteEvent, tagged messages: `Init`, `Add`, `Remove`, `Equip`, `Unequip`. Only the thing that changed gets sent.
+## How it fits together
 
+Server decides everything, client just draws it. If the server hasn't said you own something, you don't own it, full stop.
 
-## Skins and slots
+```
+SERVER - the real state: inventory, coins, gamepasses, whatever a trade or purchase decides
+  |                                    ^
+  | tells the client what changed      | asks to equip / buy / trade / gift
+  v                                    |
+CLIENT - keeps its own copy in sync, draws the UI off of that
+```
 
-Three slots: `Rifel`, `Revolver`, `Knife`. One equipped skin each. On join you get the `default_*` skin in every slot so nothing's ever empty. Defaults are `tradeable: false` and double as the "unequip" fallback.
+Both sides read from the same files in `shared/` (`Catalog.ts`, `Cases.ts`, `Gamepasses.ts`, `Monetization.ts`), so a skin or a crate or a gamepass only ever gets defined once. No risk of the client thinking something costs a different amount than the server does.
 
-New skin = one new entry in `Catalog`. That's it.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## What's actually in here
+
+### Skins and inventory
+
+The catalog is where every skin's actual info lives, name, image, rarity, which weapon slot it's for, which crate (if any) can drop it. That's `shared/Catalog.ts`, one entry per skin id. What a player owns is stored as basically nothing, just `{ id, uuid }`, and everything else gets looked up from the catalog when needed. Means an image only has to live in one place, and it never has to travel over the network at all since the client already has the same catalog loaded.
+
+The `uuid` doesn't do much yet outside of giving trading something specific to point at (and stopping people from duping a copy of something). Everything else, adding, removing, equipping, just works off the plain `id`.
+
+Four slots: rifle, revolver, knife, death effect. Everyone starts with the default skin in each one so nothing's ever sitting empty, and those defaults can't be traded away, they're the fallback if you ever unequip something. Adding a new skin is just adding one entry to the catalog, nothing else to touch.
+
+### Shop, crates, gamepasses, limiteds
+
+Six crates right now (green, blue, purple, yellow, red, and a plus one locked behind the Plus gamepass), each with its own price, its own odds by rarity, and its own opening animation. Whatever's droppable from a crate is decided entirely by the catalog, a skin just lists which crate id(s) it belongs to.
+
+Gamepasses grant a fixed set of skins the moment you buy them (clown set, limited bundle, plus), except for the 2x earnings one which just doubles your coin gain. Ownership gets checked against actual Roblox records every time you join, so even if a save gets corrupted or wiped, you don't lose something you paid real money for.
+
+Limiteds are simpler, one developer product, buy it, get the bundle straight into your inventory, no crate involved.
+
+### Gifting
+
+You can gift a gamepass or a limited bundle to someone else in the server for 10% less than buying it yourself. That discount isn't just a number on the label, it's an actual separate developer product priced lower, so what you see is what actually gets charged. Whoever you're gifting to gets recorded server side right before the purchase prompt shows up, and if they've left the server by the time it goes through, the buyer just gets it instead, better than the Robux disappearing into nothing.
+
+### Trading
+
+Pretty standard trade flow: pick items from your inventory, watch what the other person offers update live on your screen, hit ready when you're happy. Once both sides are ready a 10 second countdown kicks off, and touching your offer at all during that resets it. Right before anything actually swaps, the server double checks both people still own what they said they would, so nothing weird can happen if someone's inventory changed mid-trade.
+
+### Currency
+
+Coins come from playing matches, and get spent in the shop on crates. The 2x earnings gamepass doubles whatever you'd normally get.
+
+### Death effects
+
+Whatever death effect skin you've got equipped plays where you died, and everyone in the server sees it, not just you. Server figures out which effect and where, sends it to every client, and each client spawns it in, lets the particles burst, then cleans it up a few seconds later.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Getting started
+
+### You'll need
+
+- Node and npm
+- Rojo, both the Studio plugin and the CLI
+- Roblox Studio
+
+### Running it
+
+Clone it, then:
+
+```sh
+npm install
+npm run watch
+```
+
+`npm run watch` rebuilds on save, `npm run build` does a one off build. Once that's running, open the project in Studio through Rojo using `default.project.json` and you're good.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Testing it
 
-No UI needed. There are chat commands in `main.server.ts`:
+There are a handful of chat commands hardcoded to my own UserId in `server/main.server.ts`, from back when I was testing without any UI at all:
 
-- `add <id>` give yourself a skin, e.g. `add seer`
+- `add <id>` gives yourself a skin, e.g. `add seer`
 - `remove <id>`
 - `equip <id>`
-- `get state` dump your inventory to the output
+- `get state` dumps your inventory to the output
+- `coins` prints your balance
+- `earn <n>` / `spend <n>`
 
-I built the whole thing bottom up and tested each layer with prints before wiring any UI, which is why these exist.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## TO-DO:
+## The old weight system
 
-- **Saving.** Right now everything resets when you leave. This is the big one. Once DataStore is in, granting defaults moves behind a "new player?" check instead of running every join.
-- **Trading.** The `uuid` and the `tradeable` flag are already there waiting for it.
-- **Porting Weapons** Currently Catalog holds dummy date will need to update config with actual weapons data
-- **Currency** `Currency/` is stubbed out.
-- **The `Other` tab** in the UI has no slot behind it yet.
+Before any of this, I'd built a full survival style inventory, weight limits, stacking, hotbar and storage slots, dropping stuff on the ground, all of it. Spent a while on it too. Then I realized none of that fits a game where you just pick a skin per weapon slot, so I ripped the whole thing out and replaced it with what's here now. If you're curious what that version looked like, it's still sitting in commit `778d051`.
 
-## About the weight system (commit `778d051`)
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-Early on I made a full survival/rpg inventory system: weight limits, stacking, hotbar and storage slots with gaps, dropping items on the ground, metadata parsing, all of it. Spent a good while on it. Then I rewrote it to a skin locker and it needs none of that. Skins have no weight, you never drop one in the world, there's no grid to manage. So I deleted the whole weight/stacking/slot layer and replaced it with the catalog + one skin per slot setup that's here now. `shared/Settings.ts` is the last scrap of that old version and it'll get removed. If you want to see that system go to commit `778d051`.
+## AI usage
 
-## AI Usage
-Used ai for debugging and finding roblox api specific methods. Was also used to generate diagrams and file layout for previous readme commits. 
+Used it for debugging and looking up Roblox API specifics, and for putting together diagrams and file layout notes on earlier drafts of this readme.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Video demo
+
 https://github.com/user-attachments/assets/a5237e4f-1cca-43d1-89da-853a3781ec80
+
+## Play it
+
+The game is tester only right now message me your roblox username on slack to get access  
+https://www.roblox.com/games/100643617969932/ULTIMATE-DUELS
+
+## Questions
+
+Msg me on Slack, username firancly, id `U0BDBQL1PNV`.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+README template from https://github.com/othneildrew/Best-README-Template

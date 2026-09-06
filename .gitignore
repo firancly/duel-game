@@ -4,3 +4,4 @@
 *.tsbuildinfo
 /graphify-out
 sourcemap.json
+/assets
