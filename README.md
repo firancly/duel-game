@@ -99,6 +99,10 @@ Coins from matches, spent on crates. 2x earnings doubles the payout.
 
 Equipped deathEffect plays at your death spot, visible server-wide. Server picks effect and location, broadcasts it, each client spawns and cleans it up locally.
 
+### Party 
+
+Invite others to your party to play on the same team, allows for just the leader to queue. Functions: create, invite, accept/decline request, leave, kick, disband.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Setup
@@ -144,7 +148,7 @@ First version was a full survival inventory: weight limits, stacking, hotbar/sto
 
 ## AI usage
 
-Used for debugging, Roblox API lookups, file layout notes on earlier README drafts.
+Used for debugging, Roblox API lookups, file layout notes on earlier README drafts. Used ai to write comments for some functions since rbxts' compiled code to luau is hard to understand (semi obfuscated). 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
