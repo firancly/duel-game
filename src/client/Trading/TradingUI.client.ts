@@ -6,42 +6,68 @@ import { Store } from "../Inventory/Store";
 import * as WindowManager from "../UI/WindowManager";
 
 const player = Players.LocalPlayer;
-const gui = player.WaitForChild("PlayerGui").WaitForChild("MainScreen");
+const gui = player.WaitForChild("PlayerGui").WaitForChild("NEW_MAIN_UI");
 const mainFrame = gui.WaitForChild("MainFrame");
-const menu = mainFrame.WaitForChild("Menu");
+const menu = mainFrame.WaitForChild("Right").WaitForChild("Fondo");
 
 // player-list window
 const tradeGui = mainFrame.WaitForChild("TradeGUI") as ImageLabel;
-const listScroll = tradeGui.WaitForChild("AllPlayerFrame").WaitForChild("AllplayerScroll") as ScrollingFrame;
-const listTemplate = listScroll.WaitForChild("Template") as ImageLabel;
-const emptyIndicator = tradeGui.WaitForChild("AllPlayerFrame").WaitForChild("Empty", 5) as TextLabel | undefined;
+const allPlayerFrame = tradeGui.WaitForChild("AllPlayerFrame");
+const listScroll = allPlayerFrame.WaitForChild("AllplayerScroll") as ScrollingFrame;
+const listTemplate = listScroll.WaitForChild("TradePlayers") as ImageLabel;
+// the new UI uses the bottom "ACTUALIZANDO..." label as the list status / empty indicator
+const emptyIndicator = allPlayerFrame.FindFirstChild("Title") as TextLabel | undefined;
+const searchBox = allPlayerFrame.FindFirstChild("TextBox") as TextBox | undefined;
 
-// trade window
+for (const child of listScroll.GetChildren()) {
+	if (child !== listTemplate && child.IsA("GuiObject")) child.Destroy();
+}
+listTemplate.Visible = false;
+
+// trade window (Player1 = you, Player2 = them)
 const tradeSecond = mainFrame.WaitForChild("TradeSecondGUI") as ImageLabel;
-const upParts = tradeSecond.WaitForChild("UpParts");
-const offerScroll = tradeSecond.WaitForChild("BackgroundOffer").WaitForChild("ScrollingFrame") as ScrollingFrame;
-const offerTemplate = offerScroll.WaitForChild("ImageLabel") as ImageButton;
-const theirScroll = tradeSecond.WaitForChild("BackgroundTheirOffer").WaitForChild("ScrollingFrame") as ScrollingFrame;
-const theirTemplate = theirScroll.WaitForChild("ImageLabel") as ImageButton;
-const inventoryScroll = tradeSecond.WaitForChild("YouInventory").WaitForChild("ScrollingFrame") as ScrollingFrame;
-const inventoryTemplate = inventoryScroll.WaitForChild("ImageLabel") as ImageButton;
-const youReadyLabel = upParts.WaitForChild("YouReady") as TextLabel;
-const theirReadyLabel = upParts.WaitForChild("TheirReady") as TextLabel;
-// grow the canvas with however many items get cloned in, instead of clipping past a fixed size
-for (const s of [offerScroll, theirScroll, inventoryScroll]) s.AutomaticCanvasSize = Enum.AutomaticSize.X;
+const youPanel = tradeSecond.WaitForChild("Player1");
+const theirPanel = tradeSecond.WaitForChild("Player2");
 
-const offerCount = tradeSecond.WaitForChild("BackgroundOffer").WaitForChild("Count") as TextLabel;
-const theirCount = tradeSecond.WaitForChild("BackgroundTheirOffer").WaitForChild("Count") as TextLabel;
+const offerScroll = youPanel.WaitForChild("Offers").WaitForChild("Scroll") as ScrollingFrame;
+const offerTemplate = offerScroll.WaitForChild("Template") as ImageButton;
+const theirScroll = theirPanel.WaitForChild("Offers").WaitForChild("Scroll") as ScrollingFrame;
+const theirTemplate = theirScroll.WaitForChild("Template") as ImageButton;
+const inventoryScroll = youPanel.WaitForChild("Inventory").WaitForChild("Scroll") as ScrollingFrame;
+const inventoryTemplate = inventoryScroll.WaitForChild("Template") as ImageButton;
+
+// drop the mockup items / "+" placeholders shipped with the design
+for (const s of [offerScroll, theirScroll, inventoryScroll]) {
+	for (const child of s.GetChildren()) {
+		if (child.IsA("GuiButton") && child.Name !== "Template") child.Destroy();
+	}
+}
+offerTemplate.Visible = false;
+theirTemplate.Visible = false;
+inventoryTemplate.Visible = false;
+
+const theirChat = theirPanel.FindFirstChild("Chat") as GuiObject | undefined;
+if (theirChat !== undefined) theirChat.Visible = false;
+
+// ready state is shown with the isConnected dot on each avatar
+const youReadyLabel = youPanel.WaitForChild("LogoPlayer").WaitForChild("isConnected") as GuiObject;
+const theirReadyLabel = theirPanel.WaitForChild("LogoPlayer").WaitForChild("isConnected") as GuiObject;
+
+// offer counts go into each offer box title
+const offerCount = youPanel.WaitForChild("Offers").WaitForChild("title") as TextLabel;
+const theirCount = theirPanel.WaitForChild("Offers").WaitForChild("title") as TextLabel;
+
 const acceptButton = tradeSecond.WaitForChild("AcceptTrade") as ImageButton;
-const cancelButton = tradeSecond.WaitForChild("CancelTrade") as ImageButton;
-const tradeStateLabel = tradeSecond.WaitForChild("TradeState") as TextLabel;
+const cancelButton = tradeSecond.WaitForChild("AcceptTrade1") as ImageButton;
+const tradeStateLabel = tradeSecond.WaitForChild("TradeTitle1") as TextLabel;
 
-// incoming-request popup (under MainFrame)
+// incoming-request popup (shared with party invites, see the "Kind" attribute)
 const notification = mainFrame.WaitForChild("Notification") as Frame;
-const notifAvatar = notification.WaitForChild("AvatarBackground").WaitForChild("Avatar") as ImageLabel;
-const notifText = notification.WaitForChild("Text") as TextLabel;
-const notifAccept = notification.WaitForChild("Accept") as ImageButton;
-const notifDecline = notification.WaitForChild("Decline") as ImageButton;
+const notifFondo = notification.WaitForChild("Fondo");
+const notifAvatar = notifFondo.WaitForChild("Avatar") as ImageLabel;
+const notifText = notifFondo.WaitForChild("InviteText") as TextLabel;
+const notifAccept = notifFondo.WaitForChild("Buttons").WaitForChild("Accept") as ImageButton;
+const notifDecline = notifFondo.WaitForChild("Buttons").WaitForChild("Deny") as ImageButton;
 notification.Visible = false;
 
 // remotes
@@ -68,7 +94,38 @@ function avatar(userId: number): string {
 }
 
 function statusText(state: PresenceState): string {
-	return state === PresenceState.Lobby ? "EN LOBBY" : "EN PARTIDA";
+	return state === PresenceState.Lobby ? "IN LOBBY" : "IN MATCH";
+}
+
+const TRADE_AVAILABLE_IMAGE = "rbxassetid://114902166859839";
+const TRADE_UNAVAILABLE_IMAGE = "rbxassetid://82739869529740";
+
+// small "xN" badge for stacked items (the new item template has no text label)
+function setItemCount(entry: GuiObject, count: number) {
+	let badge = entry.FindFirstChild("Count") as TextLabel | undefined;
+
+	if (count <= 1) {
+		badge?.Destroy();
+		return;
+	}
+
+	if (badge === undefined) {
+		badge = new Instance("TextLabel");
+		badge.Name = "Count";
+		badge.AnchorPoint = new Vector2(1, 1);
+		badge.Position = UDim2.fromScale(0.95, 0.95);
+		badge.Size = UDim2.fromScale(0.5, 0.3);
+		badge.BackgroundTransparency = 1;
+		badge.Font = Enum.Font.GothamBlack;
+		badge.TextScaled = true;
+		badge.TextXAlignment = Enum.TextXAlignment.Right;
+		badge.TextColor3 = new Color3(1, 1, 1);
+		badge.TextStrokeTransparency = 0.3;
+		badge.ZIndex = entry.ZIndex + 1;
+		badge.Parent = entry;
+	}
+
+	badge.Text = `x${count}`;
 }
 
 function systemMessage(text: string) {
@@ -103,16 +160,30 @@ function passesTab(info: TradePlayerInfo): boolean {
 }
 
 // player list
+function matchesSearch(info: TradePlayerInfo): boolean {
+	const term = searchBox !== undefined ? searchBox.Text.lower() : "";
+	if (term === "") return true;
+	return (
+		info.displayName.lower().find(term, 1, true)[0] !== undefined ||
+		info.name.lower().find(term, 1, true)[0] !== undefined
+	);
+}
+
 function refreshList() {
 	for (const child of listScroll.GetChildren()) {
-		if (child.Name !== "Template" && child.IsA("GuiObject")) child.Destroy();
+		if (child !== listTemplate && child.IsA("GuiObject")) child.Destroy();
 	}
 	listTemplate.Visible = false;
+
+	if (emptyIndicator !== undefined) {
+		emptyIndicator.Text = "ACTUALIZANDO...";
+		emptyIndicator.Visible = true;
+	}
 
 	const players = getTradePlayers.InvokeServer() as TradePlayerInfo[];
 	let shown = 0;
 	for (const info of players) {
-		if (!passesTab(info)) continue;
+		if (!passesTab(info) || !matchesSearch(info)) continue;
 		shown++;
 
 		const row = listTemplate.Clone();
@@ -121,13 +192,14 @@ function refreshList() {
 		row.Parent = listScroll;
 
 		(row.FindFirstChild("Name") as TextLabel).Text = info.displayName;
-		(row.FindFirstChild("Handle") as TextLabel).Text = `@${info.name}`;
+		(row.FindFirstChild("DisplayName") as TextLabel).Text = `@${info.name}`;
 		(row.FindFirstChild("Status") as TextLabel).Text = statusText(info.state);
-		(row.FindFirstChild("Avatar") as ImageLabel).Image = avatar(info.userId);
+		(row.FindFirstChild("PlayerLogo") as ImageLabel).Image = avatar(info.userId);
 
 		const available = info.state === PresenceState.Lobby;
-		const tradeBtn = row.FindFirstChild("TradeButton") as ImageButton;
-		(tradeBtn.FindFirstChild("Title") as TextLabel).Text = available ? "TRADE" : "NO DISPONIBLE";
+		const tradeBtn = row.FindFirstChild("ImageButton") as ImageButton;
+		(tradeBtn.FindFirstChild("Title") as TextLabel).Text = available ? "TRADE" : "NOT AVAILABLE";
+		tradeBtn.Image = available ? TRADE_AVAILABLE_IMAGE : TRADE_UNAVAILABLE_IMAGE;
 		tradeBtn.Active = available;
 		if (available) {
 			tradeBtn.Activated.Connect(() => {
@@ -138,7 +210,16 @@ function refreshList() {
 	}
 
 	// show the empty indicator when the active tab has nobody
-	if (emptyIndicator !== undefined) emptyIndicator.Visible = shown === 0;
+	if (emptyIndicator !== undefined) {
+		emptyIndicator.Text = "NO PLAYERS IN GAME";
+		emptyIndicator.Visible = shown === 0;
+	}
+}
+
+if (searchBox !== undefined) {
+	searchBox.GetPropertyChangedSignal("Text").Connect(() => {
+		if (tradeGui.Visible) refreshList();
+	});
 }
 
 function setTradeTab(tab: Tabs) {
@@ -169,9 +250,9 @@ let listOpen = false;
 	tradeGui.Visible = listOpen;
 });
 
-// tab buttons (ContainerButtons: "AllButton" = All, FriendButton = Friends, ServerButton = Server)
-const TAB_ACTIVE = "rbxassetid://92004645740900";
-const TAB_INACTIVE = "rbxassetid://118371499551965";
+// tab buttons (ContainerButtons: "All" = All, "Friends" = Friends, "Server" = Server)
+const TAB_ACTIVE = "rbxassetid://114902166859839";
+const TAB_INACTIVE = "rbxassetid://79223329675877";
 
 const tradeTabs = tradeGui.WaitForChild("ContainerButtons");
 const tabButtons: ImageButton[] = [];
@@ -191,9 +272,9 @@ function wireTradeTab(name: string, tab: Tabs): ImageButton | undefined {
 	return btn;
 }
 
-const allBtn = wireTradeTab("AllButton", Tabs.All);
-wireTradeTab("FriendButton", Tabs.Friends);
-wireTradeTab("ServerButton", Tabs.Server);
+const allBtn = wireTradeTab("All", Tabs.All);
+wireTradeTab("Friends", Tabs.Friends);
+wireTradeTab("Server", Tabs.Server);
 if (allBtn !== undefined) highlightTradeTab(allBtn); // All is the default tab
 
 // incoming request opens the notification popup
@@ -201,18 +282,21 @@ let requestFrom: number | undefined;
 
 incomingTradeRequest.OnClientEvent.Connect((fromUserId: number, fromName: string) => {
 	requestFrom = fromUserId;
-	notifText.Text = `${fromName} wants to trade`;
+	notification.SetAttribute("Kind", "Trade");
+	notifText.Text = `${fromName.upper()} WANTS TO TRADE WITH YOU!`;
 	notifAvatar.Image = avatar(fromUserId);
 	notification.Visible = true;
 });
 
 notifAccept.Activated.Connect(() => {
+	if (notification.GetAttribute("Kind") !== "Trade") return;
 	if (requestFrom !== undefined) respondTradeRequest.FireServer(requestFrom, true);
 	notification.Visible = false;
 	requestFrom = undefined;
 });
 
 notifDecline.Activated.Connect(() => {
+	if (notification.GetAttribute("Kind") !== "Trade") return;
 	if (requestFrom !== undefined) respondTradeRequest.FireServer(requestFrom, false);
 	notification.Visible = false;
 	requestFrom = undefined;
@@ -251,7 +335,7 @@ function renderInventory() {
 		entry.Visible = true;
 		entry.Active = true;
 		entry.Image = def.image;
-		(entry.FindFirstChild("TextLabel") as TextLabel).Text = remaining > 1 ? `${def.name} x${remaining}` : def.name;
+		setItemCount(entry, remaining);
 		entry.Activated.Connect(() => {
 			if (totalCount(offer) >= MAX_OFFER) return; // offer is full
 			offer.set(id, (offer.get(id) ?? 0) + 1);
@@ -275,7 +359,7 @@ function renderOffer() {
 		entry.Visible = true;
 		entry.Active = true;
 		entry.Image = def.image;
-		(entry.FindFirstChild("TextLabel") as TextLabel).Text = count > 1 ? `${def.name} x${count}` : def.name;
+		setItemCount(entry, count);
 		entry.Activated.Connect(() => {
 			const left = count - 1;
 			if (left <= 0) offer.delete(id);
@@ -285,7 +369,7 @@ function renderOffer() {
 		});
 		entry.Parent = offerScroll;
 	}
-	offerCount.Text = `${totalCount(offer)}/${MAX_OFFER}`;
+	offerCount.Text = `YOUR OFFER (${totalCount(offer)}/${MAX_OFFER})`;
 }
 
 function renderAll() {
@@ -306,10 +390,10 @@ function renderTheirOffer(record: { [id: string]: number }) {
 		entry.Name = `their_${id}`;
 		entry.Visible = true;
 		entry.Image = def.image;
-		(entry.FindFirstChild("TextLabel") as TextLabel).Text = count > 1 ? `${def.name} x${count}` : def.name;
+		setItemCount(entry, count);
 		entry.Parent = theirScroll;
 	}
-	theirCount.Text = `${total}/${MAX_OFFER}`;
+	theirCount.Text = `OFFER (${total}/${MAX_OFFER})`;
 }
 offerUpdated.OnClientEvent.Connect((record: unknown) => renderTheirOffer(record as { [id: string]: number }));
 
@@ -326,8 +410,8 @@ const NOT_READY_COLOR = Color3.fromRGB(204, 23, 23);
 
 // personalized: (youReady, theirReady) from this viewer's side
 tradeConfirmed.OnClientEvent.Connect((youReady: boolean, theirReady: boolean) => {
-	youReadyLabel.TextColor3 = youReady ? READY_COLOR : NOT_READY_COLOR;
-	theirReadyLabel.TextColor3 = theirReady ? READY_COLOR : NOT_READY_COLOR;
+	youReadyLabel.BackgroundColor3 = youReady ? READY_COLOR : NOT_READY_COLOR;
+	theirReadyLabel.BackgroundColor3 = theirReady ? READY_COLOR : NOT_READY_COLOR;
 });
 
 // server drives the state label: "Waiting" or the 10-to-0 countdown
@@ -346,9 +430,9 @@ function resetOffer() {
 	offer.clear();
 	renderAll(); // draw inventory + empty offer (updates your Count)
 	clearEntries(theirScroll, theirTemplate);
-	theirCount.Text = `0/${MAX_OFFER}`;
-	youReadyLabel.TextColor3 = NOT_READY_COLOR;
-	theirReadyLabel.TextColor3 = NOT_READY_COLOR;
+	theirCount.Text = `OFFER (0/${MAX_OFFER})`;
+	youReadyLabel.BackgroundColor3 = NOT_READY_COLOR;
+	theirReadyLabel.BackgroundColor3 = NOT_READY_COLOR;
 	syncOffer(); // clear the other side's view too
 }
 
@@ -359,18 +443,16 @@ tradeStarted.OnClientEvent.Connect((otherUserId: number, otherDisplayName: strin
 	listOpen = false;
 
 	const other = Players.GetPlayerByUserId(otherUserId);
-	(upParts.WaitForChild("DisplayName") as TextLabel).Text = player.DisplayName;
-	(upParts.WaitForChild("Name") as TextLabel).Text = `@${player.Name}`;
-	(upParts.WaitForChild("YouIcon") as ImageLabel).Image = avatar(player.UserId);
-	(upParts.WaitForChild("DisplayName2") as TextLabel).Text = otherDisplayName;
-	(upParts.WaitForChild("Name2") as TextLabel).Text = other ? `@${other.Name}` : "";
-	(upParts.WaitForChild("TheirIcon") as ImageLabel).Image = avatar(otherUserId);
+	(youPanel.WaitForChild("DisplayName") as TextLabel).Text = player.DisplayName;
+	(youPanel.WaitForChild("Username") as TextLabel).Text = `@${player.Name}`;
+	(youPanel.WaitForChild("LogoPlayer") as ImageLabel).Image = avatar(player.UserId);
+	(theirPanel.WaitForChild("DisplayName") as TextLabel).Text = otherDisplayName;
+	(theirPanel.WaitForChild("Username") as TextLabel).Text = other !== undefined ? `@${other.Name}` : "";
+	(theirPanel.WaitForChild("LogoPlayer") as ImageLabel).Image = avatar(otherUserId);
 
 	resetOffer();
 	tradeSecond.Visible = true;
 });
-
-export {};
 
 // Logic for close button
 const closeBtn = tradeGui.WaitForChild("CloseButton") as GuiButton;

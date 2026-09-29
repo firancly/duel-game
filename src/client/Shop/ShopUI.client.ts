@@ -13,30 +13,63 @@ import * as WindowManager from "../UI/WindowManager";
 import * as CratePresenter from "./CratePresenter";
 
 const player = Players.LocalPlayer;
-const gui = player.WaitForChild("PlayerGui").WaitForChild("MainScreen");
+const gui = player.WaitForChild("PlayerGui").WaitForChild("NEW_MAIN_UI");
 const shop = gui.WaitForChild("MainFrame").WaitForChild("ShopGUI") as GuiObject;
-const container = shop.WaitForChild("Container") as ScrollingFrame;
-const cases = container.WaitForChild("Cases");
-const casesContainer = cases.WaitForChild("CasesContainer");
-const casesContainer2 = cases.WaitForChild("CasesContainer2");
+const container = shop.WaitForChild("Scroll") as ScrollingFrame;
 
-const productsTab = container.WaitForChild("Coins");
-const productsContainer = productsTab.WaitForChild("CoinsContainer");
-const productsContainer2 = productsTab.WaitForChild("CoinsContainer2");
+// new UI: every section is a card inside Scroll and the buttons sit directly in it
+const cases = container.WaitForChild("Cases") as GuiObject;
+const casesContainer = cases;
+const casesContainer2 = cases;
 
-const limitedsContent = container.WaitForChild("Limiteds");
-
-const gamepassesContent = container.WaitForChild("Gamepasses");
-const gamepassesContainer1 = gamepassesContent.WaitForChild("GamepassesContainer1");
-const gamepassesContainer2 = gamepassesContent.WaitForChild("GamepassesContainer2");
+const productsTab = container.WaitForChild("Coins") as GuiObject;
+const limitedsContent = container.WaitForChild("PacketLimited") as GuiObject;
+const gamepassesContent = container.WaitForChild("Gamepass") as GuiObject;
 
 const giftGui = shop.WaitForChild("GiftGUI") as ImageLabel;
-const serverPlayerScroll = giftGui.WaitForChild("ServerPlayerScroll") as ScrollingFrame;
-const giftPlayerTemplate = serverPlayerScroll.WaitForChild("Template") as ImageLabel;
+const serverPlayerScroll = giftGui.WaitForChild("FriendplayerScroll") as ScrollingFrame;
+const giftPlayerTemplate = serverPlayerScroll.WaitForChild("GiftPlayers") as ImageLabel;
 const giftSearchBox = giftGui.WaitForChild("SearchGui").WaitForChild("TextBox") as TextBox;
 const giftNameLabel = giftGui.WaitForChild("NameGamepass") as TextLabel;
 const giftPriceLabel = giftGui.WaitForChild("PriceGamepass") as TextLabel;
-const giftRobuxIcon = giftGui.WaitForChild("RobuxIcon") as ImageLabel;
+const giftRobuxIcon = giftGui.WaitForChild("ImageLabel") as ImageLabel;
+const giftTitle = giftGui.FindFirstChild("Title") as TextLabel | undefined;
+giftGui.Visible = false;
+
+// coin offers (Monetization.button) -> coin cards, in order
+const COIN_BUTTONS: Record<string, string> = {
+	first: "YellowCase",
+	second: "YellowCase1",
+	third: "YellowCase2",
+	fourth: "YellowCase3",
+	fifth: "YellowCase4",
+};
+
+// gamepass key -> card in Scroll.Gamepass (art matches the old shop)
+const GAMEPASS_CARDS: Record<string, string> = {
+	SetClown: "YellowCase",
+	LimitedBundle: "YellowCase1",
+	X2: "YellowCase2",
+	Plus: "YellowCase3",
+};
+
+// the new design only ships three gamepass cards; Plus gets a copy of the last one
+if (gamepassesContent.FindFirstChild("YellowCase3") === undefined) {
+	const source = gamepassesContent.FindFirstChild("YellowCase2");
+	if (source !== undefined) {
+		const plusCard = source.Clone();
+		plusCard.Name = "YellowCase3";
+		const art = plusCard.FindFirstChild("ImageLabel") as ImageLabel | undefined;
+		if (art !== undefined) art.Image = "rbxassetid://109151770079913";
+		plusCard.Parent = gamepassesContent;
+	}
+}
+
+// coins have no gifting
+for (const card of productsTab.GetChildren()) {
+	const gift = card.FindFirstChild("Gift");
+	if (gift !== undefined) (gift as GuiObject).Visible = false;
+}
 
 WindowManager.register("Shop", () => (shop.Visible = false));
 
@@ -64,7 +97,7 @@ const gatedCasePriceLabels = new Map<string, TextLabel>();
 function wireCase(parent: Instance, name: string, caseId: string) {
 	const btn = parent.FindFirstChild(name) as ImageButton | undefined;
 
-	const priceLabel = btn?.FindFirstChild("Price") as TextLabel | undefined;
+	const priceLabel = (btn?.FindFirstChild("Price") ?? btn?.FindFirstChild("TextLabel")) as TextLabel | undefined;
 	const caseDef = Cases.get(caseId);
 	if (priceLabel !== undefined && caseDef !== undefined) {
 		if (caseDef.requiredGamepass !== undefined) {
@@ -113,9 +146,10 @@ wireCase(casesContainer2, "PlusCase", "PlusCase");
 // Limiteds ----------------------------------------------------------------
 // One Developer Product grants a fixed skin set directly (no crate roll).
 
+// the new UI has a single limited card (PacketLimited) for the "Limited" offer
 function limitedFrame(offer: LimitedOffer): Instance | undefined {
-	const canvasGroup = limitedsContent.FindFirstChild("CanvasGroup");
-	return canvasGroup?.FindFirstChild(offer.key);
+	if (offer.key === "Limited") return limitedsContent;
+	return limitedsContent.FindFirstChild(offer.key);
 }
 
 function wireLimited(offer: LimitedOffer) {
@@ -147,7 +181,9 @@ function wireLimited(offer: LimitedOffer) {
 for (const offer of Limiteds) wireLimited(offer);
 
 function labelOffer(btn: Instance, offer: CoinOffer) {
-	const label = (btn.FindFirstChild("Price") ?? btn.FindFirstChild("Title")) as TextLabel | undefined;
+	const buy = btn.FindFirstChild("Buy");
+	const label = (buy?.FindFirstChild("TextLabel") ?? btn.FindFirstChild("Price") ?? btn.FindFirstChild("Title")) as
+		TextLabel | undefined;
 	if (label === undefined) return;
 
 	if (offer.id === 0) {
@@ -161,26 +197,31 @@ function labelOffer(btn: Instance, offer: CoinOffer) {
 }
 
 function wireOffer(parent: Instance, offer: CoinOffer) {
-	const btn = parent.FindFirstChild(offer.button) as ImageButton | undefined;
+	const btn = parent.FindFirstChild(COIN_BUTTONS[offer.button] ?? offer.button) as ImageButton | undefined;
 	if (btn === undefined) {
 		warn(`[Shop] no button "${offer.button}" in ${parent.GetFullName()}`);
 		return;
 	}
 
 	labelOffer(btn, offer);
-	btn.Activated.Connect(() => {
+
+	const promptOffer = () => {
 		print(`[Shop] clicked ${offer.button} (id ${offer.id})`);
 		if (offer.id === 0) {
 			systemMessage("This offer isn't set up yet — check back later.");
 			return;
 		}
 		MarketplaceService.PromptProductPurchase(player, offer.id);
-	});
+	};
+
+	btn.Activated.Connect(promptOffer);
+	const buy = btn.FindFirstChild("Buy") as ImageButton | undefined;
+	buy?.Activated.Connect(promptOffer);
 	// print(`[Shop] Wired product ${offer.button} → id ${offer.id}`);
 }
 
-function productParent(offer: CoinOffer): Instance {
-	return offer.container === "CoinsContainer" ? productsContainer : productsContainer2;
+function productParent(_offer: CoinOffer): Instance {
+	return productsTab;
 }
 
 for (const offer of CoinProducts) {
@@ -191,12 +232,21 @@ for (const offer of CoinProducts) {
 
 const ownedGamepasses = new Set<string>();
 
-function gamepassParent(gp: GamepassOffer): Instance {
-	return gp.container === "GamepassesContainer1" ? gamepassesContainer1 : gamepassesContainer2;
+function gamepassFrame(gp: GamepassOffer): Instance | undefined {
+	return gamepassesContent.FindFirstChild(GAMEPASS_CARDS[gp.key] ?? gp.key);
 }
 
-function gamepassFrame(gp: GamepassOffer): Instance | undefined {
-	return gamepassParent(gp).FindFirstChild(gp.key);
+// the gamepass cards carry their name + price, fill them from the Gamepasses table
+for (const gp of Gamepasses) {
+	const frame = gamepassFrame(gp);
+	if (frame === undefined) continue;
+
+	const title = frame.FindFirstChild("Title") as TextLabel | undefined;
+	if (title !== undefined) title.Text = gp.name.upper();
+
+	const buy = frame.FindFirstChild("Buy");
+	const priceLabel = buy?.FindFirstChild("TextLabel") as TextLabel | undefined;
+	if (priceLabel !== undefined && gp.price !== undefined) priceLabel.Text = `R$${gp.price}`;
 }
 
 // Roblox already blocks a duplicate purchase server-side; this is just so the
@@ -208,7 +258,7 @@ function markOwned(key: string) {
 	if (gp === undefined) return;
 
 	const frame = gamepassFrame(gp);
-	const button = frame?.FindFirstChild("Button") as ImageButton | undefined;
+	const button = frame?.FindFirstChild("Buy") as ImageButton | undefined;
 	const label = button?.FindFirstChild("TextLabel") as TextLabel | undefined;
 	if (label !== undefined) label.Text = "OWNED";
 	if (button !== undefined) button.Active = false;
@@ -221,9 +271,9 @@ function markOwned(key: string) {
 
 function wireGamepass(gp: GamepassOffer) {
 	const frame = gamepassFrame(gp);
-	const button = frame?.FindFirstChild("Button") as ImageButton | undefined;
+	const button = frame?.FindFirstChild("Buy") as ImageButton | undefined;
 	if (button === undefined) {
-		warn(`[Shop] no Button in gamepass frame "${gp.key}"`);
+		warn(`[Shop] no Buy button in gamepass card "${gp.key}"`);
 		return;
 	}
 
@@ -331,11 +381,11 @@ function renderGiftList(filter: string) {
 		row.Visible = true;
 		row.Parent = serverPlayerScroll;
 
-		(row.FindFirstChild("DisplayName") as TextLabel).Text = target.DisplayName;
-		(row.FindFirstChild("Name") as TextLabel).Text = `@${target.Name}`;
+		(row.FindFirstChild("Name") as TextLabel).Text = target.DisplayName;
+		(row.FindFirstChild("DisplayName") as TextLabel).Text = `@${target.Name}`;
 		(row.FindFirstChild("ImageLabel") as ImageLabel).Image = avatarThumb(target.UserId);
 
-		const giftButton = row.FindFirstChild("GiftButton") as ImageButton;
+		const giftButton = row.FindFirstChild("ImageButton") as ImageButton;
 		giftButton.Activated.Connect(() => sendGift(target));
 	}
 }
@@ -346,7 +396,8 @@ giftSearchBox.GetPropertyChangedSignal("Text").Connect(() => {
 
 function openGiftGui(session: GiftSession) {
 	currentGift = session;
-	giftNameLabel.Text = session.name;
+	if (giftTitle !== undefined) giftTitle.Text = `GIFT ${session.label.upper()}`;
+	giftNameLabel.Text = session.name.upper();
 	giftPriceLabel.Text = `${session.price}`;
 	giftRobuxIcon.Visible = true;
 	giftSearchBox.Text = "";
@@ -458,11 +509,19 @@ player.Chatted.Connect((msg) => {
 });
 
 // Logic for close button
-const closeBtn = shop.WaitForChild("CloseButton") as GuiButton;
-closeBtn.MouseButton1Click.Connect(() => {
-	WindowManager.closed("Shop");
-	(closeBtn.Parent as GuiObject).Visible = false;
-});
+const closeBtn = shop.FindFirstChild("CloseButton") as GuiButton | undefined;
+if (closeBtn !== undefined) {
+	closeBtn.MouseButton1Click.Connect(() => {
+		WindowManager.closed("Shop");
+		(closeBtn.Parent as GuiObject).Visible = false;
+	});
+}
+
+// scroll the shop so a section card sits at the top (positions depend on screen size in the new UI)
+function scrollToSection(section: GuiObject) {
+	const y = section.AbsolutePosition.Y - container.AbsolutePosition.Y + container.CanvasPosition.Y;
+	container.CanvasPosition = new Vector2(0, math.max(0, y));
+}
 
 // the coin display doubles as a shop shortcut
 const moneyBuyBtn = gui
@@ -475,12 +534,16 @@ moneyBuyBtn.Activated.Connect(() => {
 		return;
 	}
 	shop.Visible = true;
-	container.CanvasPosition = new Vector2(0, tabScrollValues.coins);
+	scrollToSection(tabScrollValues.coins);
 	highlightTab(coinsTab);
 });
 
-// Menu -> Shop button (toggles open/closed on repeated clicks)
-const menuShopBtn = gui.WaitForChild("MainFrame").WaitForChild("Menu").WaitForChild("Shop") as ImageButton;
+// Menu -> Store button (toggles open/closed on repeated clicks)
+const menuShopBtn = gui
+	.WaitForChild("MainFrame")
+	.WaitForChild("Right")
+	.WaitForChild("Fondo")
+	.WaitForChild("Store") as ImageButton;
 menuShopBtn.Activated.Connect(() => {
 	if (shop.Visible) {
 		WindowManager.closed("Shop");
@@ -493,19 +556,19 @@ menuShopBtn.Activated.Connect(() => {
 		return;
 	}
 	shop.Visible = true;
-	container.CanvasPosition = new Vector2(0, tabScrollValues.limiteds);
+	scrollToSection(tabScrollValues.limiteds);
 	highlightTab(limitedsTab);
 });
 
 // Opens the shop scrolled to a given tab, respecting the trade block guard.
-function openShopTab(scroll: number, tab: ImageButton) {
+function openShopTab(scroll: GuiObject, tab: ImageButton) {
 	if (shop.Visible) return;
 	if (!WindowManager.open("Shop")) {
 		systemMessage("Finish or cancel your trade first.");
 		return;
 	}
 	shop.Visible = true;
-	container.CanvasPosition = new Vector2(0, scroll);
+	scrollToSection(scroll);
 	highlightTab(tab);
 }
 
@@ -520,14 +583,14 @@ ProximityPromptService.PromptTriggered.Connect((prompt) => {
 });
 
 // Logic for tab buttons
-const tabs = shop.FindFirstChild("TabButtons") as Frame;
+const tabs = shop.WaitForChild("ContainerButtons_v1") as Frame;
 const casesTab = tabs.WaitForChild("Cases") as ImageButton;
 const coinsTab = tabs.WaitForChild("Coins") as ImageButton;
-const gamepassesTab = tabs.WaitForChild("Gamepasses") as ImageButton;
-const limitedsTab = tabs.WaitForChild("Limiteds") as ImageButton;
+const gamepassesTab = tabs.WaitForChild("Gamepass") as ImageButton;
+const limitedsTab = tabs.WaitForChild("Limited") as ImageButton;
 
-const ACTIVE_TAB = "rbxassetid://76459582722455";
-const INACTIVE_TAB = "rbxassetid://118371499551965";
+const ACTIVE_TAB = "rbxassetid://101263624536319";
+const INACTIVE_TAB = "rbxassetid://119379906708598";
 
 let currentTab: ImageButton | undefined = undefined;
 
@@ -539,11 +602,11 @@ function highlightTab(active: ImageButton) {
 		if (b.IsA("ImageButton")) {
 			if (b === active) {
 				b.Image = ACTIVE_TAB;
-				const title = b.FindFirstChild("Title") as TextLabel;
+				const title = b.FindFirstChild("TextLabel") as TextLabel;
 				title.TextColor3 = new Color3(1, 1, 1);
 			} else {
 				b.Image = INACTIVE_TAB;
-				const title1 = b.FindFirstChild("Title") as TextLabel;
+				const title1 = b.FindFirstChild("TextLabel") as TextLabel;
 				title1.TextColor3 = new Color3(0.45, 0.45, 0.45);
 			}
 		}
@@ -551,29 +614,29 @@ function highlightTab(active: ImageButton) {
 }
 
 const tabScrollValues = {
-	cases: 185,
-	coins: 375,
-	gamepasses: 560,
-	limiteds: 0,
+	cases,
+	coins: productsTab,
+	gamepasses: gamepassesContent,
+	limiteds: limitedsContent,
 };
 
 casesTab.MouseButton1Click.Connect(() => {
-	container.CanvasPosition = new Vector2(0, tabScrollValues.cases);
+	scrollToSection(tabScrollValues.cases);
 	highlightTab(casesTab);
 });
 
 coinsTab.MouseButton1Click.Connect(() => {
-	container.CanvasPosition = new Vector2(0, tabScrollValues.coins);
+	scrollToSection(tabScrollValues.coins);
 	highlightTab(coinsTab);
 });
 
 gamepassesTab.MouseButton1Click.Connect(() => {
-	container.CanvasPosition = new Vector2(0, tabScrollValues.gamepasses);
+	scrollToSection(tabScrollValues.gamepasses);
 	highlightTab(gamepassesTab);
 });
 
 limitedsTab.MouseButton1Click.Connect(() => {
-	container.CanvasPosition = new Vector2(0, tabScrollValues.limiteds);
+	scrollToSection(tabScrollValues.limiteds);
 	highlightTab(limitedsTab);
 });
 

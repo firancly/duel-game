@@ -3,14 +3,14 @@ import { getDef, WeaponSlot } from "shared/Catalog";
 import * as WindowManager from "../UI/WindowManager";
 import { Store } from "./Store";
 
-const EQUIPPED_IMAGE = "rbxassetid://126931322651156";
-const UNEQUIPPED_IMAGE = "rbxassetid://100260658216025";
+const EQUIPPED_IMAGE = "rbxassetid://101263624536319";
+const UNEQUIPPED_IMAGE = "rbxassetid://119379906708598";
 
-const ACTIVE_TAB = "rbxassetid://92004645740900";
-const INACTIVE_TAB = "rbxassetid://118371499551965";
+const ACTIVE_TAB = "rbxassetid://105610692273596";
+const INACTIVE_TAB = "rbxassetid://82739869529740";
 
 // reference
-const gui = Players.LocalPlayer.WaitForChild("PlayerGui").WaitForChild("MainScreen");
+const gui = Players.LocalPlayer.WaitForChild("PlayerGui").WaitForChild("NEW_MAIN_UI");
 const invGui = gui.WaitForChild("MainFrame").WaitForChild("InventoryGUI") as ImageLabel;
 const scroll = invGui.WaitForChild("InventoryScroll") as ScrollingFrame;
 const tabs = invGui.WaitForChild("ContainerButtons");
@@ -21,15 +21,12 @@ function systemMessage(text: string) {
 	general?.DisplaySystemMessage(text);
 }
 
-const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Exclusive"];
-const templates = new Map<string, ImageLabel>();
-for (const name of RARITY_NAMES) {
-	const t = scroll.FindFirstChild(name) as ImageLabel | undefined;
-	if (t !== undefined) {
-		t.Visible = false; // keep templates hidden
-		templates.set(name, t);
-	}
+// the new UI has a single "Template" card for every rarity (the extra copies are just mockups)
+const cardTemplate = scroll.WaitForChild("Template") as ImageLabel;
+for (const child of scroll.GetChildren()) {
+	if (child !== cardTemplate && child.Name === "Template") child.Destroy();
 }
+cardTemplate.Visible = false;
 
 // state
 let currentSlots: WeaponSlot[] = [WeaponSlot.Rifle]; // active tab slots
@@ -37,9 +34,9 @@ let fireEquip: (id: string) => void = () => {}; // set in init()
 
 // redraw grid
 function render() {
-	// clear old cards keep the rarity templates
+	// clear old cards keep the template
 	for (const child of scroll.GetChildren()) {
-		if (child.IsA("ImageLabel") && !templates.has(child.Name)) child.Destroy();
+		if (child.IsA("ImageLabel") && child !== cardTemplate) child.Destroy();
 	}
 
 	for (const [id, count] of Store.owned) {
@@ -47,11 +44,7 @@ function render() {
 		if (def === undefined) continue;
 		if (!currentSlots.includes(def.slot)) continue; // filter by active tab
 
-		// choose the box for this skin's rarity
-		const template = templates.get(def.rarity);
-		if (template === undefined) continue;
-
-		const card = template.Clone();
+		const card = cardTemplate.Clone();
 		card.Name = id;
 		card.Visible = true;
 		card.Parent = scroll;
@@ -99,7 +92,8 @@ export function init(requestEquip: (id: string) => void) {
 	fireEquip = requestEquip;
 
 	wireTab("KnifeButton", [WeaponSlot.Knife]);
-	const rifleBtn = wireTab("RifleButton", [WeaponSlot.Rifle]);
+	// "CosmeticButton" is the RIFLES tab in the new UI
+	const rifleBtn = wireTab("CosmeticButton", [WeaponSlot.Rifle]);
 	wireTab("GunButton", [WeaponSlot.Revolver]);
 	wireTab("OtherButton", [WeaponSlot.DeathEffect]);
 
@@ -112,7 +106,11 @@ export function init(requestEquip: (id: string) => void) {
 // Logic to open/close the inventory GUI
 WindowManager.register("Inventory", () => (invGui.Visible = false));
 
-const inventoryBtn = gui.WaitForChild("MainFrame").WaitForChild("Menu").WaitForChild("Inventory") as ImageButton;
+const inventoryBtn = gui
+	.WaitForChild("MainFrame")
+	.WaitForChild("Right")
+	.WaitForChild("Fondo")
+	.WaitForChild("Inventory") as ImageButton;
 inventoryBtn.MouseButton1Click.Connect(() => {
 	if (invGui.Visible) {
 		WindowManager.closed("Inventory");
