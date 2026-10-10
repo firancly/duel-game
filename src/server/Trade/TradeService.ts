@@ -5,6 +5,8 @@ import { TradePlayerInfo, MAX_OFFER } from "shared/types/Trade";
 import { remote } from "shared/Remotes";
 import { getDef } from "shared/Catalog";
 import * as InventoryService from "server/Inventory";
+import * as MissionService from "server/Missions";
+import { MissionStat } from "shared/Missions";
 
 const getTradePlayers = remote("GetTradePlayers", "RemoteFunction");
 const sendTradeRequest = remote("SendTradeRequest", "RemoteEvent");
@@ -180,6 +182,8 @@ function executeTrade(session: TradeSession) {
 
 	tradeComplete.FireClient(session.a, true);
 	tradeComplete.FireClient(session.b, true);
+	MissionService.report(session.a, MissionStat.CompleteTrades);
+	MissionService.report(session.b, MissionStat.CompleteTrades);
 	print(`[Trade] completed ${session.a.Name} <-> ${session.b.Name}`);
 	endSession(session);
 }

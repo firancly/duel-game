@@ -4,6 +4,8 @@ import { Catalog, getDef, Rarity } from "shared/Catalog";
 import * as CurrencyService from "server/Currency";
 import * as InventoryService from "server/Inventory";
 import * as GamepassService from "server/Gamepass";
+import * as MissionService from "server/Missions";
+import { MissionStat } from "shared/Missions";
 import { CaseResultPayload } from "shared/types/Shop";
 
 const openCase = remote("OpenCase", "RemoteEvent"); // C->S: caseId
@@ -67,6 +69,8 @@ function handleOpen(player: Player, caseId: string) {
 	}
 
 	InventoryService.addItem(player, skinId);
+	MissionService.report(player, MissionStat.OpenCrates);
+	MissionService.report(player, MissionStat.SpendCoins, def.price);
 	const skinDef = getDef(skinId)!;
 	// The client holds this until the player has clicked the crate open.
 	const payload: CaseResultPayload = { ok: true, caseId, skinId, rarity };
