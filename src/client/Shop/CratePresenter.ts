@@ -11,15 +11,22 @@ const player = Players.LocalPlayer;
 const CRATE_DIST_SCALE = 2.6; // how far ahead of the camera, as a multiple of the crate's largest extent
 const CRATE_MIN_DIST = 10;
 const CRATE_MAX_DIST = 40; // never stage so far out
-const CRATE_DROP = 2; // studs the crate is staged below eye level
+const CRATE_DROP = 0; // studs the crate is staged below eye level
 const DRAG_SENSITIVITY = 0.006; // radians per pixel
 const PITCH_LIMIT = 1.0; // radians
 const CLICK_SLOP = 8; // pixels of movement still counted as a click, not a drag
 const REVEAL_HOLD = 4; // seconds the reward stays up before auto-closing
+const CRATE_SEQUENCE_FOLDER = "CratesSequence"; // Workspace folder with the authored parts
+const CRATE_CAMERA_PART = "CrateCamera"; // camera position + orientation
+const CRATE_SPAWN_PART = "CrateSpawn"; // where the crate sits
 
 // Drag-to-spin is parked, not deleted — bring it back (ALLOW_DRAG_ROTATE = true)
 // once skins can walk out of the opened crate and need to be looked at.
 const ALLOW_DRAG_ROTATE = false;
+
+// Name + rarity text shown at the bottom of the screen on reveal. Off = the weapon
+// and the rarity-coloured light carry the reveal on their own.
+const SHOW_REWARD_TEXT = true;
 
 // Optional sfx — drop your own rbxassetid in, empty string means silent.
 const SOUND_CLICK = "";
@@ -101,13 +108,25 @@ function levelCamera(cam: Camera) {
 	cam.CFrame = CFrame.lookAt(cam.CFrame.Position, cam.CFrame.Position.add(facing));
 }
 
-function stageCFrame(cam: Camera, radius: number): CFrame {
+// Workspace.CratesSequence holds two authored parts: CrateCamera (where the camera
+// sits) and CrateSpawn (where the crate's centre goes, with the part's rotation).
+// Either one missing falls back to staging in front of the player's own camera.
+function sequencePart(name: string): BasePart | undefined {
+	const part = Workspace.FindFirstChild(CRATE_SEQUENCE_FOLDER)?.FindFirstChild(name);
+	if (part === undefined || !part.IsA("BasePart")) return undefined;
+	return part;
+}
+
+function stageCFrame(cam: Camera, radius: number, ignore?: Instance): CFrame {
 	let dist = math.clamp(radius * CRATE_DIST_SCALE, CRATE_MIN_DIST, CRATE_MAX_DIST);
 
-	// If the player is facing a wall, pull the crate in so it doesn't stage inside it.
+	// If the view is blocked by a wall, pull the crate in so it doesn't stage inside it.
 	const params = new RaycastParams();
 	params.FilterType = Enum.RaycastFilterType.Exclude;
-	params.FilterDescendantsInstances = player.Character !== undefined ? [player.Character] : [];
+	const excluded: Instance[] = [];
+	if (player.Character !== undefined) excluded.push(player.Character);
+	if (ignore !== undefined) excluded.push(ignore);
+	params.FilterDescendantsInstances = excluded;
 
 	const hit = Workspace.Raycast(cam.CFrame.Position, cam.CFrame.LookVector.mul(dist), params);
 	if (hit !== undefined) dist = math.max(radius * 0.75 + 2, hit.Distance - radius * 0.6);
@@ -173,67 +192,74 @@ function registerClick() {
 	if (clicks >= CLICKS_TO_OPEN) reveal();
 }
 
-function buildBillboard(parent: BasePart, skinId: string, rarity: string | undefined, radius: number) {
+function rarityColorFor(skinId: string, rarity: string | undefined): Color3 {
 	const def = getDef(skinId);
-	const color = RarityColor.get((rarity ?? def?.rarity ?? Rarity.Common) as Rarity) ?? new Color3(1, 1, 1);
+	return RarityColor.get((rarity ?? def?.rarity ?? Rarity.Common) as Rarity) ?? new Color3(1, 1, 1);
+}
 
-	const billboard = new Instance("BillboardGui");
-	billboard.Name = "Reward";
-	billboard.Size = new UDim2(0, 190, 0, 230);
-	billboard.StudsOffset = new Vector3(0, math.max(3.4, radius * 0.9), 0);
-	billboard.AlwaysOnTop = true;
-	billboard.Parent = parent;
+// Screen-space reveal text pinned to the bottom of the screen: skin name, with
+// its rarity underneath in the rarity colour. Torn down in finish().
+let rewardGui: ScreenGui | undefined;
 
-	const frame = new Instance("Frame");
-	frame.Size = UDim2.fromScale(1, 1);
-	frame.BackgroundColor3 = Color3.fromRGB(20, 20, 26);
-	frame.BackgroundTransparency = 0.25;
-	frame.Parent = billboard;
-
-	const corner = new Instance("UICorner");
-	corner.CornerRadius = new UDim(0, 12);
-	corner.Parent = frame;
+function makeRewardLabel(
+	parent: Instance,
+	text: string,
+	color: Color3,
+	font: Enum.Font,
+	y: number,
+	height: number,
+): TextLabel {
+	const label = new Instance("TextLabel");
+	label.Size = UDim2.fromScale(1, height);
+	label.Position = UDim2.fromScale(0, y);
+	label.BackgroundTransparency = 1;
+	label.Text = text;
+	label.TextColor3 = color;
+	label.TextScaled = true;
+	label.Font = font;
+	label.TextTransparency = 1; // faded in by showRewardText
+	label.Parent = parent;
 
 	const stroke = new Instance("UIStroke");
-	stroke.Color = color;
-	stroke.Thickness = 3;
-	stroke.Parent = frame;
+	stroke.Color = Color3.fromRGB(0, 0, 0);
+	stroke.Thickness = 2;
+	stroke.Transparency = 1;
+	stroke.Parent = label;
 
-	const image = new Instance("ImageLabel");
-	image.Size = UDim2.fromScale(0.85, 0.6);
-	image.Position = UDim2.fromScale(0.075, 0.06);
-	image.BackgroundTransparency = 1;
-	image.Image = def?.image ?? "";
-	image.ScaleType = Enum.ScaleType.Fit;
-	image.Parent = frame;
+	return label;
+}
 
-	const nameLabel = new Instance("TextLabel");
-	nameLabel.Size = UDim2.fromScale(1, 0.18);
-	nameLabel.Position = UDim2.fromScale(0, 0.66);
-	nameLabel.BackgroundTransparency = 1;
-	nameLabel.Text = def?.name ?? skinId;
-	nameLabel.TextColor3 = new Color3(1, 1, 1);
-	nameLabel.TextScaled = true;
-	nameLabel.Font = Enum.Font.GothamBold;
-	nameLabel.Parent = frame;
+function showRewardText(skinId: string, rarity: string | undefined, color: Color3) {
+	const playerGui = player.FindFirstChildOfClass("PlayerGui");
+	if (playerGui === undefined) return;
 
-	const rarityLabel = new Instance("TextLabel");
-	rarityLabel.Size = UDim2.fromScale(1, 0.14);
-	rarityLabel.Position = UDim2.fromScale(0, 0.83);
-	rarityLabel.BackgroundTransparency = 1;
-	rarityLabel.Text = rarity ?? def?.rarity ?? "";
-	rarityLabel.TextColor3 = color;
-	rarityLabel.TextScaled = true;
-	rarityLabel.Font = Enum.Font.GothamMedium;
-	rarityLabel.Parent = frame;
+	const def = getDef(skinId);
 
-	// pop in
-	billboard.Size = new UDim2(0, 0, 0, 0);
-	TweenService.Create(billboard, new TweenInfo(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Size: new UDim2(0, 190, 0, 230),
-	}).Play();
+	const gui = new Instance("ScreenGui");
+	gui.Name = "CrateRewardText";
+	gui.IgnoreGuiInset = true;
+	gui.ResetOnSpawn = false;
+	gui.DisplayOrder = 100;
+	gui.Parent = playerGui;
 
-	return color;
+	const holder = new Instance("Frame");
+	holder.AnchorPoint = new Vector2(0.5, 1);
+	holder.Position = new UDim2(0.5, 0, 1, -48);
+	holder.Size = new UDim2(0.5, 0, 0, 120);
+	holder.BackgroundTransparency = 1;
+	holder.Parent = gui;
+
+	const nameLabel = makeRewardLabel(holder, def?.name ?? skinId, new Color3(1, 1, 1), Enum.Font.GothamBold, 0, 0.6);
+	const rarityLabel = makeRewardLabel(holder, rarity ?? def?.rarity ?? "", color, Enum.Font.GothamMedium, 0.62, 0.34);
+
+	const fade = new TweenInfo(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out);
+	for (const label of [nameLabel, rarityLabel]) {
+		TweenService.Create(label, fade, { TextTransparency: 0 }).Play();
+		const stroke = label.FindFirstChildOfClass("UIStroke");
+		if (stroke !== undefined) TweenService.Create(stroke, fade, { Transparency: 0 }).Play();
+	}
+
+	rewardGui = gui;
 }
 
 let pendingSkinId: string | undefined;
@@ -447,7 +473,11 @@ function reveal() {
 	// A crate whose effect parts aren't in the config would otherwise be silent.
 	if (vfxLanes.size() === 0) playAllEffects();
 
-	const color = skinId !== undefined ? buildBillboard(c.root, skinId, pendingRarity, c.radius) : c.light.Color;
+	let color = c.light.Color;
+	if (skinId !== undefined) {
+		color = rarityColorFor(skinId, pendingRarity);
+		if (SHOW_REWARD_TEXT) showRewardText(skinId, pendingRarity, color);
+	}
 
 	c.light.Color = color;
 	c.light.Brightness = 8;
@@ -649,6 +679,8 @@ export function finish() {
 	savedCameraCF = undefined;
 	savedCameraSubject = undefined;
 
+	rewardGui?.Destroy();
+	rewardGui = undefined;
 	folder?.Destroy();
 	folder = undefined;
 	crate = undefined;
@@ -713,10 +745,26 @@ export function present(caseId: string, skinId: string, rarity: string | undefin
 	savedCameraCF = cam.CFrame;
 	savedCameraSubject = cam.CameraSubject;
 	cam.CameraType = Enum.CameraType.Scriptable;
-	levelCamera(cam); // horizontal + straight ahead, regardless of where the player was looking
+
+	const cameraPart = sequencePart(CRATE_CAMERA_PART);
+	const spawnPart = sequencePart(CRATE_SPAWN_PART);
+
+	if (cameraPart !== undefined) {
+		cam.CFrame = cameraPart.CFrame; // authored position and orientation, used exactly
+	} else {
+		warn(`[Crate] Workspace.${CRATE_SEQUENCE_FOLDER}.${CRATE_CAMERA_PART} not found - using the player's camera`);
+		levelCamera(cam); // horizontal + straight ahead, regardless of where the player was looking
+	}
 
 	crate = built;
-	baseCF = stageCFrame(cam, built.radius);
+	if (spawnPart !== undefined) {
+		baseCF = spawnPart.CFrame; // crate centre lands on the part, rotated to match it
+	} else {
+		warn(
+			`[Crate] Workspace.${CRATE_SEQUENCE_FOLDER}.${CRATE_SPAWN_PART} not found - staging in front of the camera`,
+		);
+		baseCF = stageCFrame(cam, built.radius, cameraPart);
+	}
 	print(
 		`[Crate] staged ${caseId} at ${string.format("%.1f", cam.CFrame.Position.sub(baseCF.Position).Magnitude)} studs`,
 	);
