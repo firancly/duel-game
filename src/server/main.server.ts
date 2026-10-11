@@ -64,6 +64,18 @@ function handleInventoryCommand(player: Player, msg: string) {
 		const n = tonumber(itemId);
 		if (n !== undefined) CurrencyService.spend(player, n);
 	}
+
+	if (msg === "potions") print("potions:", CurrencyService.getPotions(player));
+
+	if (keyword === "earnpotions" && itemId !== "") {
+		const n = tonumber(itemId);
+		if (n !== undefined) CurrencyService.earnPotions(player, n);
+	}
+
+	if (keyword === "spendpotions" && itemId !== "") {
+		const n = tonumber(itemId);
+		if (n !== undefined) print(CurrencyService.spendPotions(player, n));
+	}
 }
 
 // Dev-only mission test commands. Output goes to the server Output window, not chat.

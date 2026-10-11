@@ -38,6 +38,7 @@ function onPlayerAdded(player: Player) {
 
 	wallets.set(player, wallet);
 	Replicator.sendInit(player, { player, amount: wallet.Data.coins });
+	Replicator.sendPotions(player, wallet.Data.potions);
 	notifyChanged(player, wallet.Data.coins);
 
 	print("[CurrencyService] Loaded wallet for:", player.Name);
@@ -88,6 +89,33 @@ export function setBalance(player: Player, amount: number): Result {
 	return { success: true, balance: profile.Data.coins };
 }
 
+export function getPotions(player: Player): number {
+	return wallets.get(player)?.Data.potions ?? 0;
+}
+
+// give potions (mission rewards)
+export function earnPotions(player: Player, amount: number): Result {
+	if (amount <= 0) return { success: false, reason: "INVALID_AMOUNT" };
+	const profile = wallets.get(player);
+	if (profile === undefined) return { success: false, reason: "NO_WALLET" };
+
+	profile.Data.potions += amount;
+	Replicator.sendPotions(player, profile.Data.potions);
+	return { success: true, balance: profile.Data.potions };
+}
+
+// take potions, fails if they can't afford it
+export function spendPotions(player: Player, amount: number): Result {
+	if (amount <= 0) return { success: false, reason: "INVALID_AMOUNT" };
+	const profile = wallets.get(player);
+	if (profile === undefined) return { success: false, reason: "NO_WALLET" };
+	if (profile.Data.potions < amount) return { success: false, reason: "INSUFFICIENT" };
+
+	profile.Data.potions -= amount;
+	Replicator.sendPotions(player, profile.Data.potions);
+	return { success: true, balance: profile.Data.potions };
+}
+
 // Yields until this player's wallet has finished loading, then returns the balance.
 // For legacy Luau to safely read a starting value regardless of PlayerAdded handler order.
 export function waitForBalance(player: Player): number {
@@ -103,6 +131,8 @@ export function init() {
 	Players.PlayerAdded.Connect(onPlayerAdded);
 	Players.PlayerRemoving.Connect(onPlayerRemoving);
 	for (const player of Players.GetPlayers()) onPlayerAdded(player);
+
+	Replicator.onAskForPotions((player) => getPotions(player));
 
 	Replicator.onAskForWallet((player) => {
 		const profile = wallets.get(player);
