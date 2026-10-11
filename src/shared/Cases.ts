@@ -11,6 +11,8 @@ export interface CaseDef {
 	price: number;
 	weights: { [rarity: string]: number };
 	requiredGamepass?: string; // Gamepasses.ts key, only owners can open this case
+	currency?: "coins" | "potions"; // what `price` is paid in; coins when omitted
+	robuxProductId?: number; // developer product that buys-and-opens this case for Robux
 
 	// Presentation:
 	color?: Color3; // tint for the procedurally built crate
@@ -114,4 +116,27 @@ export const Cases = new Map<string, CaseDef>([
 			animationId: "rbxassetid://137625390937684",
 		},
 	],
+	[
+		"HalloweenCase",
+		{
+			id: "HalloweenCase",
+			name: "Halloween Case",
+			price: 200, // potions
+			currency: "potions",
+			robuxProductId: 3717835254, // Halloween Box, 49 R$
+			weights: STANDARD_WEIGHTS, // rarities with no Halloween skin are skipped at roll time
+			color: Color3.fromRGB(255, 120, 0),
+			modelName: "HalloweenCase",
+			// TODO: animationId once the crate animation is published
+		},
+	],
 ]);
+
+export function findCaseByProductId(productId: number): CaseDef | undefined {
+	for (const [, def] of Cases) {
+		if (def.robuxProductId !== undefined && def.robuxProductId !== 0 && def.robuxProductId === productId) {
+			return def;
+		}
+	}
+	return undefined;
+}

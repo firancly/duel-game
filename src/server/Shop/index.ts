@@ -1,5 +1,5 @@
 import { remote } from "shared/Remotes";
-import { Cases } from "shared/Cases";
+import { CaseDef, Cases } from "shared/Cases";
 import { Catalog, getDef, Rarity } from "shared/Catalog";
 import * as CurrencyService from "server/Currency";
 import * as InventoryService from "server/Inventory";
@@ -29,15 +29,74 @@ function belongsToCase(caseId: string, skinCaseId: string | string[] | undefined
 	return typeIs(skinCaseId, "string") ? skinCaseId === caseId : skinCaseId.includes(caseId);
 }
 
-// pick a random tradeable skin of the given rarity that belongs to this case
+// tradeable skins of the given rarity that belong to this case
 // (defaults are tradeable:false excluded; skins not assigned a caseId can't drop from any crate)
-function randomSkinOfRarity(rarity: string, caseId: string): string | undefined {
+function skinPool(rarity: string, caseId: string): string[] {
 	const pool: string[] = [];
 	for (const [id, def] of Catalog) {
 		if (def.rarity === rarity && def.tradeable && belongsToCase(caseId, def.caseId)) pool.push(id);
 	}
+	return pool;
+}
+
+function randomSkinOfRarity(rarity: string, caseId: string): string | undefined {
+	const pool = skinPool(rarity, caseId);
 	if (pool.size() === 0) return undefined;
 	return pool[math.random(0, pool.size() - 1)];
+}
+
+// The case's weights minus rarities it has no skin for. A case that only holds, say, Rare /
+// Epic / Mythic skins then keeps the same relative odds between those instead of failing
+// (and refunding) every roll that lands on an empty rarity.
+function availableWeights(def: CaseDef): { [rarity: string]: number } {
+	const weights: { [rarity: string]: number } = {};
+	for (const [rarity, weight] of pairs(def.weights)) {
+		if (skinPool(rarity as string, def.id).size() > 0) weights[rarity as string] = weight;
+	}
+	return weights;
+}
+
+function currencyOf(def: CaseDef): "coins" | "potions" {
+	return def.currency ?? "coins";
+}
+
+// take the price in the case's currency (server-authoritative; false if they can't afford it)
+function charge(player: Player, def: CaseDef): boolean {
+	const result =
+		currencyOf(def) === "potions"
+			? CurrencyService.spendPotions(player, def.price)
+			: CurrencyService.spend(player, def.price);
+	return result.success;
+}
+
+function refund(player: Player, def: CaseDef) {
+	if (currencyOf(def) === "potions") CurrencyService.earnPotions(player, def.price);
+	else CurrencyService.earn(player, def.price);
+}
+
+function sendFailure(player: Player, caseId: string, text: string) {
+	const payload: CaseResultPayload = { ok: false, caseId };
+	caseResult.FireClient(player, text, payload);
+}
+
+type RollOutcome = { ok: true } | { ok: false; rarity: string };
+
+// Rolls a skin for the case, grants it and tells the client what to reveal. Pricing is
+// the caller's job. Fails (granting nothing) when no skin of the rolled rarity exists.
+function rollAndGrant(player: Player, def: CaseDef): RollOutcome {
+	const rarity = rollRarity(availableWeights(def));
+	const skinId = randomSkinOfRarity(rarity, def.id);
+	if (skinId === undefined) return { ok: false, rarity };
+
+	InventoryService.addItem(player, skinId);
+	MissionService.report(player, MissionStat.OpenCrates);
+	const skinDef = getDef(skinId)!;
+
+	// The client holds this until the player has clicked the crate open.
+	const payload: CaseResultPayload = { ok: true, caseId: def.id, skinId, rarity };
+	caseResult.FireClient(player, `You unboxed ${skinDef.name} [${skinDef.rarity}] from the ${def.name}!`, payload);
+	print(`[Shop] ${player.Name} opened ${def.name} → ${skinId} (${rarity})`);
+	return { ok: true };
 }
 
 // Type shop in chat to open/close the shop gui
@@ -46,36 +105,37 @@ function handleOpen(player: Player, caseId: string) {
 	if (def === undefined) return;
 
 	if (def.requiredGamepass !== undefined && !GamepassService.hasGamepass(player, def.requiredGamepass)) {
-		const payload: CaseResultPayload = { ok: false, caseId };
-		caseResult.FireClient(player, `You need the ${def.requiredGamepass} gamepass to open ${def.name}.`, payload);
+		sendFailure(player, caseId, `You need the ${def.requiredGamepass} gamepass to open ${def.name}.`);
 		return;
 	}
 
-	// take the money first (server-authoritative; fails if broke)
-	const spent = CurrencyService.spend(player, def.price);
-	if (!spent.success) {
-		const payload: CaseResultPayload = { ok: false, caseId };
-		caseResult.FireClient(player, `Not enough coins for ${def.name}.`, payload);
+	if (!charge(player, def)) {
+		sendFailure(player, caseId, `Not enough ${currencyOf(def)} for ${def.name}.`);
 		return;
 	}
 
-	const rarity = rollRarity(def.weights);
-	const skinId = randomSkinOfRarity(rarity, caseId);
-	if (skinId === undefined) {
-		CurrencyService.earn(player, def.price); // refund — no skin of that rarity exists
-		const payload: CaseResultPayload = { ok: false, caseId };
-		caseResult.FireClient(player, `No ${rarity} skin available — refunded.`, payload);
+	const outcome = rollAndGrant(player, def);
+	if (!outcome.ok) {
+		refund(player, def); // no skin of that rarity exists
+		sendFailure(player, caseId, `No ${outcome.rarity} skin available — refunded.`);
 		return;
 	}
 
-	InventoryService.addItem(player, skinId);
-	MissionService.report(player, MissionStat.OpenCrates);
-	MissionService.report(player, MissionStat.SpendCoins, def.price);
-	const skinDef = getDef(skinId)!;
-	// The client holds this until the player has clicked the crate open.
-	const payload: CaseResultPayload = { ok: true, caseId, skinId, rarity };
-	caseResult.FireClient(player, `You unboxed ${skinDef.name} [${skinDef.rarity}] from the ${def.name}!`, payload);
-	print(`[Shop] ${player.Name} opened ${def.name} → ${skinId} (${rarity})`);
+	if (currencyOf(def) === "coins") MissionService.report(player, MissionStat.SpendCoins, def.price);
+}
+
+// Robux purchase of a case (developer product receipt): already paid, so just roll and
+// grant. Returns false when nothing could be granted so the receipt is retried, not lost.
+export function openPaidCase(player: Player, caseId: string): boolean {
+	const def = Cases.get(caseId);
+	if (def === undefined) return false;
+
+	const outcome = rollAndGrant(player, def);
+	if (!outcome.ok) {
+		warn(`[Shop] ${def.name} bought with Robux but no ${outcome.rarity} skin exists - receipt will retry`);
+		return false;
+	}
+	return true;
 }
 
 export function init() {
