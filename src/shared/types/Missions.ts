@@ -4,5 +4,6 @@ export interface MissionView {
 	description: string;
 	progress: number;
 	target: number;
+	reward: number; // potions
 	completed: boolean;
 }

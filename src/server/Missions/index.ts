@@ -5,6 +5,7 @@
 import { Players } from "@rbxts/services";
 import ProfileStore, { Profile } from "@rbxts/profile-store";
 import { remote } from "shared/Remotes";
+import * as CurrencyService from "server/Currency";
 import { DAILY_MISSION_COUNT, getMissionDef, MissionDef, MissionPool, MissionStat } from "shared/Missions";
 import { MissionView } from "shared/types/Missions";
 
@@ -79,6 +80,7 @@ function snapshot(profile: Profile<PlayerMissionData>): MissionView[] {
 			description: def.description,
 			progress: m.progress,
 			target: def.target,
+			reward: def.reward,
 			completed: m.completed,
 		});
 	}
@@ -89,10 +91,11 @@ function replicate(player: Player, profile: Profile<PlayerMissionData>) {
 	missionsUpdate.FireClient(player, snapshot(profile));
 }
 
-// TBD: the reward design isn't decided yet. This is the single place it plugs in -
-// called exactly once per mission, the moment it completes.
+// Called exactly once per mission, the moment it completes.
 function grantReward(player: Player, def: MissionDef) {
-	print(`[Missions] ${player.Name} completed "${def.description}" - reward TBD`);
+	const result = CurrencyService.earnPotions(player, def.reward);
+	if (!result.success) warn(`[Missions] potion reward failed for ${player.Name}: ${result.reason}`);
+	else print(`[Missions] ${player.Name} completed "${def.description}" +${def.reward} potions`);
 }
 
 export function getMissions(player: Player): MissionView[] {
