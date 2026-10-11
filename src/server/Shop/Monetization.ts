@@ -6,8 +6,11 @@ import {
 	findLimitedById,
 	findLimitedByKey,
 	findLimitedByGiftProductId,
+	findPotionPackById,
 } from "shared/Monetization";
 import { Gamepasses, findGamepassByGiftProductId } from "shared/Gamepasses";
+import { Cases, findCaseByProductId } from "shared/Cases";
+import * as ShopService from "server/Shop";
 import { remote } from "shared/Remotes";
 import * as CurrencyService from "server/Currency";
 import * as GamepassService from "server/Gamepass";
@@ -121,6 +124,30 @@ function processLimitedGiftReceipt(player: Player, receipt: ReceiptInfo): Enum.P
 	return Enum.ProductPurchaseDecision.PurchaseGranted;
 }
 
+// A potion pack: credit the potions. Left unprocessed (retried) if the wallet isn't loaded.
+function processPotionReceipt(player: Player, receipt: ReceiptInfo): Enum.ProductPurchaseDecision | undefined {
+	const pack = findPotionPackById(receipt.ProductId);
+	if (pack === undefined) return undefined; // not a potion pack either
+
+	const result = CurrencyService.earnPotions(player, pack.potions);
+	if (!result.success) return Enum.ProductPurchaseDecision.NotProcessedYet;
+
+	print(`[Monetization] ${player.Name} bought ${pack.name}: +${pack.potions} potions (product ${receipt.ProductId})`);
+	return Enum.ProductPurchaseDecision.PurchaseGranted;
+}
+
+// A case bought straight with Robux (buy-and-open): roll, grant and show the crate. If no
+// skin could be granted the receipt stays unprocessed so it retries instead of eating the Robux.
+function processCaseReceipt(player: Player, receipt: ReceiptInfo): Enum.ProductPurchaseDecision | undefined {
+	const def = findCaseByProductId(receipt.ProductId);
+	if (def === undefined) return undefined; // not a case product either
+
+	if (!ShopService.openPaidCase(player, def.id)) return Enum.ProductPurchaseDecision.NotProcessedYet;
+
+	print(`[Monetization] ${player.Name} bought ${def.name} with Robux (product ${receipt.ProductId})`);
+	return Enum.ProductPurchaseDecision.PurchaseGranted;
+}
+
 function processReceipt(receipt: ReceiptInfo): Enum.ProductPurchaseDecision {
 	if (processed.has(receipt.PurchaseId)) return Enum.ProductPurchaseDecision.PurchaseGranted;
 
@@ -131,7 +158,9 @@ function processReceipt(receipt: ReceiptInfo): Enum.ProductPurchaseDecision {
 		processCoinReceipt(player, receipt) ??
 		processGiftReceipt(player, receipt) ??
 		processLimitedGiftReceipt(player, receipt) ??
-		processLimitedReceipt(player, receipt);
+		processLimitedReceipt(player, receipt) ??
+		processCaseReceipt(player, receipt) ??
+		processPotionReceipt(player, receipt);
 	if (decision === undefined) {
 		warn(`[Monetization] receipt for unknown product id ${receipt.ProductId} — check shared/Monetization.ts`);
 		return Enum.ProductPurchaseDecision.NotProcessedYet;
@@ -153,9 +182,13 @@ export function init() {
 		warn("[Monetization] shared/Monetization.ts has a Limited with no skinIds — buying it grants nothing.");
 	}
 	if (Limiteds.some((offer) => offer.giftProductId === undefined || offer.giftProductId === 0)) {
-		warn(
-			"[Monetization] shared/Monetization.ts has a Limited with no giftProductId — its Gift button won't work.",
-		);
+		warn("[Monetization] shared/Monetization.ts has a Limited with no giftProductId — its Gift button won't work.");
+	}
+
+	for (const [, def] of Cases) {
+		if (def.robuxProductId === 0) {
+			warn(`[Monetization] shared/Cases.ts: ${def.name} has robuxProductId 0 - its Robux purchase won't work.`);
+		}
 	}
 
 	MarketplaceService.ProcessReceipt = processReceipt;

@@ -47,3 +47,25 @@ export function findLimitedByGiftProductId(productId: number): LimitedOffer | un
 	for (const offer of Limiteds) if (offer.giftProductId === productId) return offer;
 	return undefined;
 }
+
+// A potion pack: one Developer Product credits `potions` to the buyer's balance.
+export interface PotionPack {
+	key: string;
+	id: number; // Developer Product id
+	name: string;
+	potions: number; // amount credited on purchase
+	tag: string; // CollectionService tag on the button that buys it
+}
+
+// TODO: the potion amounts are placeholders - confirm them. Robux prices live on the products.
+export const PotionPacks: PotionPack[] = [
+	{ key: "Small", id: 3717835304, name: "Small Potion Pack", potions: 250, tag: "PotionPackSmall" }, // 49 R$
+	{ key: "Medium", id: 3717835331, name: "Medium Potion Pack", potions: 650, tag: "PotionPackMedium" }, // 149 R$
+	{ key: "Large", id: 3717835430, name: "Large Potion Pack", potions: 1400, tag: "PotionPackLarge" }, // 299 R$
+	{ key: "Mega", id: 3717835581, name: "Mega Potion Pack", potions: 3000, tag: "PotionPackMega" }, // 549 R$
+];
+
+export function findPotionPackById(productId: number): PotionPack | undefined {
+	for (const pack of PotionPacks) if (pack.id === productId) return pack;
+	return undefined;
+}
