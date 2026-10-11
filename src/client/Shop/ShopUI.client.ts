@@ -484,12 +484,15 @@ caseResult.OnClientEvent.Connect((text: string, payload?: CaseResultPayload) => 
 
 	if (payload?.ok !== true || payload.skinId === undefined) return;
 
+	// Only bring the shop back if it was the one open: a case opened from elsewhere
+	// (e.g. the event screen) must not pop the shop up afterwards.
+	const reopenShop = shop.Visible;
 	shop.Visible = false;
 	const started = CratePresenter.present(payload.caseId, payload.skinId, payload.rarity, () => {
-		shop.Visible = WindowManager.open("Shop");
+		if (reopenShop) shop.Visible = WindowManager.open("Shop");
 	});
 	if (!started) {
-		shop.Visible = WindowManager.open("Shop"); // presenter refused, put the shop back
+		if (reopenShop) shop.Visible = WindowManager.open("Shop"); // presenter refused, put the shop back
 		systemMessage(`Error: the ${payload.caseId} crate does not exist.`);
 	}
 });
