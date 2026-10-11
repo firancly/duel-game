@@ -745,6 +745,115 @@ export const Catalog = new Map<string, SkinDef>([
 			model: "RiflePlus",
 		},
 	],
+
+	// Halloween Case. `model` is the child name expected under ReplicatedStorage/Assets/Weapons.
+	// Rare
+	[
+		"cursed_rifle",
+		{
+			id: "cursed_rifle",
+			name: "Cursed Rifle",
+			image: "rbxassetid://115241072912988",
+			slot: WeaponSlot.Rifle,
+			rarity: Rarity.Rare,
+			tradeable: true,
+			caseId: "HalloweenCase",
+			model: "CursedRifle",
+		},
+	],
+	[
+		"pumpkin_revolver",
+		{
+			id: "pumpkin_revolver",
+			name: "Pumpkin Revolver",
+			image: "rbxassetid://97290463223034",
+			slot: WeaponSlot.Revolver,
+			rarity: Rarity.Rare,
+			tradeable: true,
+			caseId: "HalloweenCase",
+			model: "PumpkinRevolver",
+		},
+	],
+	[
+		"shadow_knife",
+		{
+			id: "shadow_knife",
+			name: "Shadow Knife",
+			image: "rbxassetid://89173602963254",
+			slot: WeaponSlot.Knife,
+			rarity: Rarity.Rare,
+			tradeable: true,
+			caseId: "HalloweenCase",
+			model: "ShadowKnife",
+		},
+	],
+	// Epic
+	[
+		"shadow_rifle",
+		{
+			id: "shadow_rifle",
+			name: "Shadow Rifle",
+			image: "rbxassetid://136521111618539",
+			slot: WeaponSlot.Rifle,
+			rarity: Rarity.Epic,
+			tradeable: true,
+			caseId: "HalloweenCase",
+			model: "ShadowRifle",
+		},
+	],
+	[
+		"spectral_revolver",
+		{
+			id: "spectral_revolver",
+			name: "Spectral Revolver",
+			image: "rbxassetid://118549764364914",
+			slot: WeaponSlot.Revolver,
+			rarity: Rarity.Epic,
+			tradeable: true,
+			caseId: "HalloweenCase",
+			model: "SpectralRevolver",
+		},
+	],
+	[
+		"spectral_katana",
+		{
+			id: "spectral_katana",
+			name: "Spectral Katana",
+			image: "rbxassetid://90276246183220",
+			slot: WeaponSlot.Knife,
+			rarity: Rarity.Epic,
+			tradeable: true,
+			caseId: "HalloweenCase",
+			model: "SpectralKatana",
+		},
+	],
+	// Mythic (the blue rifle is still tbd)
+	[
+		"raven_revolver",
+		{
+			id: "raven_revolver",
+			name: "Raven Revolver",
+			image: "rbxassetid://80501125119009",
+			slot: WeaponSlot.Revolver,
+			rarity: Rarity.Mythic,
+			tradeable: true,
+			caseId: "HalloweenCase",
+			model: "RavenRevolver",
+		},
+	],
+	[
+		"raven_axe",
+		{
+			id: "raven_axe",
+			name: "Raven Axe",
+			image: "rbxassetid://81846984402806",
+			slot: WeaponSlot.Knife,
+			rarity: Rarity.Mythic,
+			tradeable: true,
+			caseId: "HalloweenCase",
+			model: "RavenAxe",
+		},
+	],
 ]);
 
 export const DEFAULT_SKINS = new Map<WeaponSlot, string>([
