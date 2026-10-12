@@ -7,6 +7,8 @@ export enum MissionStat {
 	// Call MissionService.report(player, MissionStat.WinMatches | GetKills, n) from it.
 	WinMatches = "WinMatches",
 	GetKills = "GetKills",
+	// Reported by server/Ghost each time a player's shot on the match Ghost counts.
+	GhostHits = "GhostHits",
 }
 
 export interface MissionDef {
@@ -35,6 +37,7 @@ export const MissionPool: MissionDef[] = [
 	{ id: "win_3", description: "Win 3 matches", stat: MissionStat.WinMatches, target: 3, reward: 100 },
 	{ id: "kill_10", description: "Get 10 kills", stat: MissionStat.GetKills, target: 10, reward: 100 },
 	{ id: "kill_25", description: "Get 25 kills", stat: MissionStat.GetKills, target: 25, reward: 100 },
+	{ id: "ghost_1", description: "Shoot the Ghost", stat: MissionStat.GhostHits, target: 1, reward: 100 },
 ];
 
 const byId = new Map<string, MissionDef>();

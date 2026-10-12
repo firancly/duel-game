@@ -9,6 +9,7 @@ import * as GamepassService from "./Gamepass";
 import * as PartyService from "./Party";
 import * as MatchmakingService from "./Matchmaking/index";
 import * as MissionService from "./Missions";
+import * as GhostService from "./Ghost";
 import { Mode } from "./Matchmaking/index";
 import { MissionStat } from "shared/Missions";
 
@@ -21,6 +22,7 @@ GamepassService.init();
 PartyService.init();
 MatchmakingService.init();
 MissionService.init();
+GhostService.init();
 
 // Broadcasts a system message into everyone's chat window. DisplaySystemMessage is
 // client-only, so route it through a remote and let each client display it locally.
@@ -121,6 +123,18 @@ function handleMissionCommand(player: Player, msg: string) {
 	}
 }
 
+// Dev-only ghost test commands. Output goes to the server Output window, not chat.
+//   ghost spawn    put a ghost in front of you, outside any match
+//   ghost hit      score a hit on the ghost that is out, as if you had shot it
+//   ghost clear    remove every ghost and cancel every pending spawn
+function handleGhostCommand(player: Player, msg: string) {
+	if (player.UserId !== 11170246) return;
+
+	if (msg === "ghost spawn") print(`[Ghost] debug spawn: ${GhostService.debugSpawn(player)}`);
+	if (msg === "ghost hit") print(`[Ghost] debug hit: ${GhostService.debugHit(player)}`);
+	if (msg === "ghost clear") GhostService.debugClear();
+}
+
 // Party chat commands
 function handlePartyCommand(player: Player, msg: string) {
 	const parts = msg.split(" ");
@@ -196,6 +210,7 @@ generalChannel.ShouldDeliverCallback = (message, textSource) => {
 			const msg = message.Text;
 			handleInventoryCommand(player, msg);
 			handleMissionCommand(player, msg);
+			handleGhostCommand(player, msg);
 			handlePartyCommand(player, msg);
 			handleMatchmakingCommand(player, msg);
 		}
