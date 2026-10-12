@@ -3,6 +3,7 @@ import { PresenceState } from "shared/Presence";
 import { TradePlayerInfo, MAX_OFFER } from "shared/types/Trade";
 import { getDef } from "shared/Catalog";
 import { Store } from "../Inventory/Store";
+import { trackTagged } from "../UI/Tags";
 import * as WindowManager from "../UI/WindowManager";
 
 const player = Players.LocalPlayer;
@@ -57,8 +58,15 @@ const theirReadyLabel = theirPanel.WaitForChild("LogoPlayer").WaitForChild("isCo
 const offerCount = youPanel.WaitForChild("Offers").WaitForChild("title") as TextLabel;
 const theirCount = theirPanel.WaitForChild("Offers").WaitForChild("title") as TextLabel;
 
-const acceptButton = tradeSecond.WaitForChild("AcceptTrade") as ImageButton;
-const cancelButton = tradeSecond.WaitForChild("AcceptTrade1") as ImageButton;
+// The accept / decline buttons are found by tag (see bindTagged), so they can be moved or
+// renamed in Studio. The authored names below are only a fallback for untagged UI.
+const TAG_TRADE_ACCEPT = "TradeAccept"; // trade window: ready up
+const TAG_TRADE_CANCEL = "TradeCancel"; // trade window: back out
+const TAG_REQUEST_ACCEPT = "TradeRequestAccept"; // incoming-request popup
+const TAG_REQUEST_DECLINE = "TradeRequestDecline"; // incoming-request popup
+
+const acceptFallback = tradeSecond.FindFirstChild("AcceptTrade");
+const cancelFallback = tradeSecond.FindFirstChild("AcceptTrade1");
 const tradeStateLabel = tradeSecond.WaitForChild("TradeTitle1") as TextLabel;
 
 // incoming-request popup (shared with party invites, see the "Kind" attribute)
@@ -66,8 +74,9 @@ const notification = mainFrame.WaitForChild("Notification") as Frame;
 const notifFondo = notification.WaitForChild("Fondo");
 const notifAvatar = notifFondo.WaitForChild("Avatar") as ImageLabel;
 const notifText = notifFondo.WaitForChild("InviteText") as TextLabel;
-const notifAccept = notifFondo.WaitForChild("Buttons").WaitForChild("Accept") as ImageButton;
-const notifDecline = notifFondo.WaitForChild("Buttons").WaitForChild("Deny") as ImageButton;
+const notifButtons = notifFondo.FindFirstChild("Buttons");
+const requestAcceptFallback = notifButtons?.FindFirstChild("Accept");
+const requestDeclineFallback = notifButtons?.FindFirstChild("Deny");
 notification.Visible = false;
 
 // remotes
@@ -132,6 +141,20 @@ function systemMessage(text: string) {
 	const channels = TextChatService.FindFirstChild("TextChannels");
 	const general = channels?.FindFirstChild("RBXGeneral") as TextChannel | undefined;
 	general?.DisplaySystemMessage(text);
+}
+
+// Binds `onPressed` to every button carrying `tag`, now or later, plus the authored
+// fallback button. A button is only ever bound once, even if it is both.
+const boundButtons = new Set<GuiButton>();
+function bindTagged(tag: string, fallback: Instance | undefined, onPressed: () => void) {
+	const bind = (button: GuiButton) => {
+		if (boundButtons.has(button)) return;
+		boundButtons.add(button);
+		button.Activated.Connect(onPressed);
+	};
+
+	if (fallback !== undefined && fallback.IsA("GuiButton")) bind(fallback);
+	trackTagged<GuiButton>(tag, bind);
 }
 
 function recordFromMap(m: Map<string, number>): { [id: string]: number } {
@@ -288,19 +311,15 @@ incomingTradeRequest.OnClientEvent.Connect((fromUserId: number, fromName: string
 	notification.Visible = true;
 });
 
-notifAccept.Activated.Connect(() => {
+function answerRequest(accept: boolean) {
 	if (notification.GetAttribute("Kind") !== "Trade") return;
-	if (requestFrom !== undefined) respondTradeRequest.FireServer(requestFrom, true);
+	if (requestFrom !== undefined) respondTradeRequest.FireServer(requestFrom, accept);
 	notification.Visible = false;
 	requestFrom = undefined;
-});
+}
 
-notifDecline.Activated.Connect(() => {
-	if (notification.GetAttribute("Kind") !== "Trade") return;
-	if (requestFrom !== undefined) respondTradeRequest.FireServer(requestFrom, false);
-	notification.Visible = false;
-	requestFrom = undefined;
-});
+bindTagged(TAG_REQUEST_ACCEPT, requestAcceptFallback, () => answerRequest(true));
+bindTagged(TAG_REQUEST_DECLINE, requestDeclineFallback, () => answerRequest(false));
 
 // your offer
 const offer = new Map<string, number>();
@@ -398,12 +417,12 @@ function renderTheirOffer(record: { [id: string]: number }) {
 offerUpdated.OnClientEvent.Connect((record: unknown) => renderTheirOffer(record as { [id: string]: number }));
 
 // confirm / cancel / complete
-acceptButton.Activated.Connect(() => {
+bindTagged(TAG_TRADE_ACCEPT, acceptFallback, () => {
 	confirmTrade.FireServer();
 	systemMessage("You accepted. Waiting for the other player...");
 });
 
-cancelButton.Activated.Connect(() => cancelTrade.FireServer());
+bindTagged(TAG_TRADE_CANCEL, cancelFallback, () => cancelTrade.FireServer());
 
 const READY_COLOR = Color3.fromRGB(46, 222, 41);
 const NOT_READY_COLOR = Color3.fromRGB(204, 23, 23);
