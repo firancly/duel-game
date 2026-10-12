@@ -603,7 +603,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "clown_knife",
 			name: "Clown Knife",
-			image: "115078168421020",
+			image: "rbxassetid://115078168421020",
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
@@ -615,7 +615,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "clown_revolver",
 			name: "Clown Revolver",
-			image: "108150556777435",
+			image: "rbxassetid://108150556777435",
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
@@ -627,7 +627,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "clown_rifle",
 			name: "Clown Rifle",
-			image: "110932845783102",
+			image: "rbxassetid://110932845783102",
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
@@ -639,7 +639,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "bunny_knife",
 			name: "Bunny Knife",
-			image: "70498879481873",
+			image: "rbxassetid://70498879481873",
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
@@ -651,7 +651,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "bunny_revolver",
 			name: "Bunny Revolver",
-			image: "89582338283207",
+			image: "rbxassetid://89582338283207",
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
@@ -663,7 +663,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "bunny_rifle",
 			name: "Bunny Rifle",
-			image: "133673579511371",
+			image: "rbxassetid://133673579511371",
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
@@ -675,7 +675,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "monster_knife",
 			name: "Monster Knife",
-			image: "82984634841435",
+			image: "rbxassetid://82984634841435",
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
@@ -687,7 +687,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "monster_revolver",
 			name: "Monster Revolver",
-			image: "118755764803986",
+			image: "rbxassetid://118755764803986",
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
@@ -699,7 +699,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "monster_rifle",
 			name: "Monster Rifle",
-			image: "111204684412544",
+			image: "rbxassetid://111204684412544",
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
@@ -711,7 +711,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "plus_knife",
 			name: "Plus Knife",
-			image: "109018950683268",
+			image: "rbxassetid://109018950683268",
 			slot: WeaponSlot.Knife,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
@@ -724,7 +724,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "plus_revolver",
 			name: "Plus Revolver",
-			image: "94675130514431",
+			image: "rbxassetid://94675130514431",
 			slot: WeaponSlot.Revolver,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
@@ -737,7 +737,7 @@ export const Catalog = new Map<string, SkinDef>([
 		{
 			id: "plus_rifle",
 			name: "Plus Rifle",
-			image: "115991414856384",
+			image: "rbxassetid://115991414856384",
 			slot: WeaponSlot.Rifle,
 			rarity: Rarity.Exclusive,
 			tradeable: true,
