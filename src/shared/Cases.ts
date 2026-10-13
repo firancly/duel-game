@@ -20,6 +20,8 @@ export interface CaseDef {
 	animationId?: string; // published opening animation, e.g. "rbxassetid://123". Falls back to the
 	// model's AnimSaves KeyframeSequence, which only registers reliably in Studio.
 	animationName?: string; // which take in AnimSaves to use, when the model holds several
+	openSoundId?: string; // "rbxassetid://123", played once as the opening animation starts
+	revealSoundId?: string; // "rbxassetid://123", played as the reward pops out
 	displayYaw?: number; // degrees to turn the crate so its front faces the player. Rotating the
 	// model's RootPart in Studio does nothing the presenter overwrites that CFrame every frame.
 	// A "DisplayYaw" attribute on the Model wins over this value.
@@ -53,6 +55,7 @@ export const Cases = new Map<string, CaseDef>([
 			color: Color3.fromRGB(70, 175, 90),
 			modelName: "BaseCrate",
 			animationId: "rbxassetid://76979230787849",
+			openSoundId: "rbxassetid://103103373491932",
 		},
 	],
 	[
@@ -65,6 +68,7 @@ export const Cases = new Map<string, CaseDef>([
 			color: Color3.fromRGB(60, 130, 235),
 			modelName: "BlueCase",
 			animationId: "rbxassetid://93372038146365",
+			openSoundId: "rbxassetid://114128227406848",
 		},
 	],
 	[
@@ -77,6 +81,7 @@ export const Cases = new Map<string, CaseDef>([
 			color: Color3.fromRGB(150, 75, 220),
 			modelName: "PurpleCase",
 			animationId: "rbxassetid://121691184616834",
+			openSoundId: "rbxassetid://71479100563125",
 		},
 	],
 	[
@@ -89,6 +94,7 @@ export const Cases = new Map<string, CaseDef>([
 			color: Color3.fromRGB(240, 195, 55),
 			modelName: "YellowCase",
 			animationId: "rbxassetid://98328322984532",
+			openSoundId: "rbxassetid://84096641936532",
 		},
 	],
 	[
@@ -101,6 +107,7 @@ export const Cases = new Map<string, CaseDef>([
 			color: Color3.fromRGB(215, 60, 60),
 			modelName: "RedCase",
 			animationId: "rbxassetid://133525921658689",
+			openSoundId: "rbxassetid://73127933401668",
 		},
 	],
 	[
@@ -114,6 +121,7 @@ export const Cases = new Map<string, CaseDef>([
 			color: Color3.fromRGB(255, 210, 60),
 			modelName: "PlusCase",
 			animationId: "rbxassetid://137625390937684",
+			openSoundId: "rbxassetid://130291271967956",
 		},
 	],
 	[
@@ -127,6 +135,7 @@ export const Cases = new Map<string, CaseDef>([
 			weights: STANDARD_WEIGHTS, // rarities with no Halloween skin are skipped at roll time
 			color: Color3.fromRGB(255, 120, 0),
 			modelName: "HalloweenCase",
+			openSoundId: "rbxassetid://96902830946603",
 			// TODO: animationId once the crate animation is published
 		},
 	],

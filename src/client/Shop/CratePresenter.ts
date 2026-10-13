@@ -1,5 +1,5 @@
 import { Players, ReplicatedStorage, RunService, TweenService, UserInputService, Workspace } from "@rbxts/services";
-import { Cases, CLICKS_TO_OPEN } from "shared/Cases";
+import { CaseDef, Cases, CLICKS_TO_OPEN } from "shared/Cases";
 import { getDef, Rarity, RarityColor } from "shared/Catalog";
 import { ANIMATION_SPEED, ANIMATION_WEIGHT, CrateVFX, VfxTiming } from "shared/CrateVFX";
 import * as CrateModel from "./CrateModel";
@@ -28,9 +28,11 @@ const ALLOW_DRAG_ROTATE = false;
 // and the rarity-coloured light carry the reveal on their own.
 const SHOW_REWARD_TEXT = true;
 
-// Optional sfx — drop your own rbxassetid in, empty string means silent.
-const SOUND_CLICK = "";
-const SOUND_OPEN = "";
+// Crate sounds, "rbxassetid://123". A case can carry its own in shared/Cases.ts
+// (openSoundId / revealSoundId); these are used by any case that doesn't. "" means silent.
+const SOUND_CLICK = ""; // every click on the crate
+const SOUND_OPEN = ""; // once, as the opening animation starts
+const SOUND_REVEAL = ""; // as the reward pops out
 
 type State = "Idle" | "Presenting" | "Revealed" | "Closing";
 
@@ -39,6 +41,7 @@ let session = 0; // bumped on every teardown, invalidates pending task.delay cal
 let onDone: (() => void) | undefined;
 
 let crate: Crate | undefined;
+let activeCase: CaseDef | undefined; // the case being opened, for its per-case sounds
 let folder: Folder | undefined;
 let connections: RBXScriptConnection[] = [];
 
@@ -84,11 +87,14 @@ export function isBusy(): boolean {
 	return state !== "Idle";
 }
 
-function playSound(id: string, parent: Instance) {
-	if (id === "") return;
+// Sounds live in the presentation folder, not on the crate: a Sound outside a part isn't
+// positional, so it plays at full volume wherever the camera sits, and it is cut off with
+// everything else when the ceremony is torn down.
+function playSound(id: string | undefined) {
+	if (id === undefined || id === "" || folder === undefined) return;
 	const s = new Instance("Sound");
 	s.SoundId = id;
-	s.Parent = parent;
+	s.Parent = folder;
 	s.Play();
 	s.Ended.Connect(() => s.Destroy());
 }
@@ -165,7 +171,9 @@ function registerClick() {
 	if (crate === undefined) return;
 
 	clicks += 1;
-	playSound(SOUND_CLICK, crate.root);
+	playSound(SOUND_CLICK);
+	// the first click is what sets the opening animation going
+	if (clicks === 1) playSound(activeCase?.openSoundId ?? SOUND_OPEN);
 
 	// Rigged crate: each click releases the next slice of the authored animation,
 	// which the render loop pauses at. The last click lets it run to the end.
@@ -467,7 +475,7 @@ function reveal() {
 	const c = crate;
 	const skinId = pendingSkinId;
 
-	playSound(SOUND_OPEN, c.root);
+	playSound(activeCase?.revealSoundId ?? SOUND_REVEAL);
 	popLid();
 	if (skinId !== undefined) spawnRewardWeapon(c.root, c.radius, skinId);
 	// A crate whose effect parts aren't in the config would otherwise be silent.
@@ -684,6 +692,7 @@ export function finish() {
 	folder?.Destroy();
 	folder = undefined;
 	crate = undefined;
+	activeCase = undefined;
 	rewardWeapon = undefined;
 	rewardWeaponBase = undefined;
 	rewardWeaponSpin = false;
@@ -716,6 +725,7 @@ export function present(caseId: string, skinId: string, rarity: string | undefin
 
 	state = "Presenting";
 	onDone = done;
+	activeCase = def;
 	pendingSkinId = skinId;
 	pendingRarity = rarity;
 
