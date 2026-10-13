@@ -23,7 +23,7 @@ const casesContainer = cases;
 const casesContainer2 = cases;
 
 const productsTab = container.WaitForChild("Coins") as GuiObject;
-const limitedsContent = container.WaitForChild("PacketLimited") as GuiObject;
+const limitedsContent = container.WaitForChild("HalloweenPack") as GuiObject;
 const gamepassesContent = container.WaitForChild("Gamepass") as GuiObject;
 
 const giftGui = shop.WaitForChild("GiftGUI") as ImageLabel;
@@ -180,7 +180,19 @@ function wireLimited(offer: LimitedOffer) {
 
 for (const offer of Limiteds) wireLimited(offer);
 
+// 12000 -> "12,000"
+function formatCount(amount: number): string {
+	const [grouped] = string.gsub(string.reverse(tostring(amount)), "(%d%d%d)", "%1,");
+	const text = string.reverse(grouped);
+	return string.sub(text, 1, 1) === "," ? string.sub(text, 2) : text;
+}
+
 function labelOffer(btn: Instance, offer: CoinOffer) {
+	// The amount on the card comes from the same table the server grants from, so the
+	// two can't drift apart.
+	const amountLabel = btn.FindFirstChild("AmountCoins");
+	if (amountLabel !== undefined && amountLabel.IsA("TextLabel")) amountLabel.Text = formatCount(offer.coins);
+
 	const buy = btn.FindFirstChild("Buy");
 	const label = (buy?.FindFirstChild("TextLabel") ?? btn.FindFirstChild("Price") ?? btn.FindFirstChild("Title")) as
 		TextLabel | undefined;
@@ -529,6 +541,7 @@ function scrollToSection(section: GuiObject) {
 // the coin display doubles as a shop shortcut
 const moneyBuyBtn = gui
 	.WaitForChild("MainFrame")
+	.WaitForChild("Money")
 	.WaitForChild("MoneyBackground")
 	.WaitForChild("BuyButton") as ImageButton;
 moneyBuyBtn.Activated.Connect(() => {
