@@ -1,4 +1,4 @@
-export type WindowName = "Shop" | "Inventory" | "Trade";
+export type WindowName = "Shop" | "Inventory" | "Trade" | "Party";
 
 const closers = new Map<WindowName, () => void>();
 let active: WindowName | undefined;

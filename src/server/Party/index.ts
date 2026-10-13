@@ -8,6 +8,7 @@
 
 import { HttpService, Players } from "@rbxts/services";
 import { remote } from "shared/Remotes";
+import { MAX_PARTY_SIZE } from "shared/Party";
 
 interface PartyData {
 	leader: Player;
@@ -64,25 +65,38 @@ export function createParty(leader: Player): string {
 	return id;
 }
 
+// In a party with at least one other player. A party of one only exists because its
+// leader sent an invite, and that alone must not stop them being invited or joining
+// someone else.
+function isGrouped(player: Player): boolean {
+	const id = playerParty.get(player);
+	return id !== undefined && parties.get(id)!.members.size() > 1;
+}
+
 export function invitePlayer(inviter: Player, target: Player) {
 	const id = playerParty.get(inviter) ?? createParty(inviter);
 	const party = parties.get(id)!;
 
 	if (party.leader !== inviter) return;
-	if (isInParty(target) || party.members.includes(target)) return;
+	if (target === inviter || isGrouped(target)) return;
+	if (party.members.size() >= MAX_PARTY_SIZE) return;
 
 	party.invites.add(target);
 	partyInvited.FireClient(target, inviter);
 }
 
 export function acceptInvite(player: Player, leader: Player) {
-	if (isInParty(player)) return;
+	if (isGrouped(player)) return;
 
 	const id = playerParty.get(leader);
 	if (id === undefined) return;
 
 	const party = parties.get(id)!;
 	if (!party.invites.has(player)) return;
+	if (party.members.size() >= MAX_PARTY_SIZE) return;
+
+	// Their own party of one, left over from an invite they sent, goes away when they join.
+	if (isInParty(player)) disbandParty(player);
 
 	party.invites.delete(player);
 	party.members.push(player);
@@ -126,11 +140,15 @@ export function disbandParty(leader: Player) {
 	const party = parties.get(id)!;
 	if (party.leader !== leader) return;
 
-	for (const member of party.members) playerParty.delete(member);
+	const former = party.members;
+	for (const member of former) playerParty.delete(member);
 	parties.delete(id);
 
 	party.members = [];
 	broadcast(party);
+	// broadcast only reaches current members, and there are none left: tell everyone who
+	// was in it that they are on their own again (an empty list means "no party").
+	for (const member of former) partyUpdated.FireClient(member, []);
 }
 
 function removeMember(party: PartyData, target: Player) {
@@ -140,6 +158,7 @@ function removeMember(party: PartyData, target: Player) {
 	party.members.remove(idx);
 	playerParty.delete(target);
 	broadcast(party);
+	partyUpdated.FireClient(target, []); // the one who left or was kicked is no longer a member
 }
 
 function onPlayerRemoving(player: Player) {
