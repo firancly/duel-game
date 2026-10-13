@@ -2,7 +2,11 @@ import { Players, ReplicatedStorage } from "@rbxts/services";
 
 const player = Players.LocalPlayer;
 const gui = player.WaitForChild("PlayerGui").WaitForChild("NEW_MAIN_UI");
-const moneyLabel = gui.WaitForChild("MainFrame").WaitForChild("MoneyBackground").WaitForChild("TextLabel") as TextLabel;
+const moneyLabel = gui
+	.WaitForChild("MainFrame")
+	.WaitForChild("Money")
+	.WaitForChild("MoneyBackground")
+	.WaitForChild("TextLabel") as TextLabel;
 
 const remotes = ReplicatedStorage.WaitForChild("Remotes");
 const walletUpdate = remotes.WaitForChild("WalletUpdate") as RemoteEvent;
