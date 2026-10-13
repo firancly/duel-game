@@ -1,5 +1,5 @@
 import { Players, TextChatService } from "@rbxts/services";
-import { getDef, WeaponSlot } from "shared/Catalog";
+import { getDef, Rarity, RarityColor, WeaponSlot } from "shared/Catalog";
 import * as WindowManager from "../UI/WindowManager";
 import { Store } from "./Store";
 
@@ -21,12 +21,27 @@ function systemMessage(text: string) {
 	general?.DisplaySystemMessage(text);
 }
 
-// the new UI has a single "Template" card for every rarity (the extra copies are just mockups)
-const cardTemplate = scroll.WaitForChild("Template") as ImageLabel;
-for (const child of scroll.GetChildren()) {
-	if (child !== cardTemplate && child.Name === "Template") child.Destroy();
+// One authored card per rarity, named Template_<Rarity> (Template_Common, Template_Mythic,
+// ...), each carrying that rarity's box art. A weapon's card is a clone of its rarity's one.
+const TEMPLATE_PREFIX = "Template_";
+const FALLBACK_RARITY = Rarity.Common;
+
+const cardTemplates = new Map<Rarity, GuiObject>();
+const templateInstances = new Set<Instance>();
+for (const [rarity] of RarityColor) {
+	const template = scroll.FindFirstChild(`${TEMPLATE_PREFIX}${rarity}`);
+	if (template === undefined || !template.IsA("GuiObject")) {
+		warn(`[Inventory] no ${TEMPLATE_PREFIX}${rarity} card in InventoryScroll - using the fallback card`);
+		continue;
+	}
+	template.Visible = false;
+	cardTemplates.set(rarity, template);
+	templateInstances.add(template);
 }
-cardTemplate.Visible = false;
+
+function templateFor(rarity: Rarity): GuiObject | undefined {
+	return cardTemplates.get(rarity) ?? cardTemplates.get(FALLBACK_RARITY);
+}
 
 // state
 let currentSlots: WeaponSlot[] = [WeaponSlot.Rifle]; // active tab slots
@@ -34,9 +49,9 @@ let fireEquip: (id: string) => void = () => {}; // set in init()
 
 // redraw grid
 function render() {
-	// clear old cards keep the template
+	// clear old cards, keep the templates
 	for (const child of scroll.GetChildren()) {
-		if (child.IsA("ImageLabel") && child !== cardTemplate) child.Destroy();
+		if (child.IsA("GuiObject") && !templateInstances.has(child)) child.Destroy();
 	}
 
 	for (const [id, count] of Store.owned) {
@@ -44,7 +59,10 @@ function render() {
 		if (def === undefined) continue;
 		if (!currentSlots.includes(def.slot)) continue; // filter by active tab
 
-		const card = cardTemplate.Clone();
+		const template = templateFor(def.rarity);
+		if (template === undefined) continue; // no cards authored at all, already warned
+
+		const card = template.Clone();
 		card.Name = id;
 		card.Visible = true;
 		card.Parent = scroll;
