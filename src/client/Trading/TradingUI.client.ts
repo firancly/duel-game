@@ -64,6 +64,7 @@ const TAG_TRADE_ACCEPT = "TradeAccept"; // trade window: ready up
 const TAG_TRADE_CANCEL = "TradeCancel"; // trade window: back out
 const TAG_REQUEST_ACCEPT = "TradeRequestAccept"; // incoming-request popup
 const TAG_REQUEST_DECLINE = "TradeRequestDecline"; // incoming-request popup
+const TAG_REQUESTS_TOGGLE = "TradeRequestsToggle"; // switches incoming trade requests on / off
 
 const acceptFallback = tradeSecond.FindFirstChild("AcceptTrade");
 const cancelFallback = tradeSecond.FindFirstChild("AcceptTrade1");
@@ -93,6 +94,7 @@ const tradeConfirmed = remotes.WaitForChild("TradeConfirmed") as RemoteEvent;
 const tradeComplete = remotes.WaitForChild("TradeComplete") as RemoteEvent;
 const tradeState = remotes.WaitForChild("TradeState") as RemoteEvent;
 const respondTradeRequest = remotes.WaitForChild("RespondTradeRequest") as RemoteEvent;
+const setTradeRequestsEnabled = remotes.WaitForChild("SetTradeRequestsEnabled") as RemoteFunction;
 
 // helpers
 function avatar(userId: number): string {
@@ -219,9 +221,11 @@ function refreshList() {
 		(row.FindFirstChild("Status") as TextLabel).Text = statusText(info.state);
 		(row.FindFirstChild("PlayerLogo") as ImageLabel).Image = avatar(info.userId);
 
-		const available = info.state === PresenceState.Lobby;
+		const inLobby = info.state === PresenceState.Lobby;
+		const available = inLobby && info.acceptsTrades;
 		const tradeBtn = row.FindFirstChild("ImageButton") as ImageButton;
-		(tradeBtn.FindFirstChild("Title") as TextLabel).Text = available ? "TRADE" : "NOT AVAILABLE";
+		const buttonText = available ? "TRADE" : inLobby ? "TRADES OFF" : "NOT AVAILABLE";
+		(tradeBtn.FindFirstChild("Title") as TextLabel).Text = buttonText;
 		tradeBtn.Image = available ? TRADE_AVAILABLE_IMAGE : TRADE_UNAVAILABLE_IMAGE;
 		tradeBtn.Active = available;
 		if (available) {
@@ -320,6 +324,36 @@ function answerRequest(accept: boolean) {
 
 bindTagged(TAG_REQUEST_ACCEPT, requestAcceptFallback, () => answerRequest(true));
 bindTagged(TAG_REQUEST_DECLINE, requestDeclineFallback, () => answerRequest(false));
+
+// Switch for incoming trade requests
+let acceptingRequests = true; // what the server starts every session with
+let toggleInFlight = false;
+
+function renderRequestsToggle(button: GuiButton) {
+	button.SetAttribute("TradesEnabled", acceptingRequests); // lets Studio style the two states
+
+	const text = acceptingRequests ? "YES" : "NO";
+	if (button.IsA("TextButton")) {
+		button.Text = text;
+		return;
+	}
+	const label = button.FindFirstChild("Title") ?? button.FindFirstChildWhichIsA("TextLabel");
+	if (label !== undefined && label.IsA("TextLabel")) label.Text = text;
+}
+
+const requestToggles = trackTagged<GuiButton>(TAG_REQUESTS_TOGGLE, renderRequestsToggle);
+
+bindTagged(TAG_REQUESTS_TOGGLE, undefined, () => {
+	if (toggleInFlight) return; // wait for the server's answer before flipping again
+	toggleInFlight = true;
+	const [ok, stored] = pcall(() => setTradeRequestsEnabled.InvokeServer(!acceptingRequests));
+	toggleInFlight = false;
+	if (!ok || !typeIs(stored, "boolean")) return;
+
+	acceptingRequests = stored;
+	for (const button of requestToggles) renderRequestsToggle(button);
+	systemMessage(stored ? "Trade requests are on." : "Trade requests are off. Nobody can send you one.");
+});
 
 // your offer
 const offer = new Map<string, number>();

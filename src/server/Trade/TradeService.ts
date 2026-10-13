@@ -20,9 +20,13 @@ const tradeConfirmed = remote("TradeConfirmed", "RemoteEvent");
 const tradeComplete = remote("TradeComplete", "RemoteEvent");
 const tradeState = remote("TradeState", "RemoteEvent"); // S->C: text for the TradeState label
 const respondTradeRequest = remote("RespondTradeRequest", "RemoteEvent"); // C->S: (fromUserId, accept)
+const setTradeRequestsEnabled = remote("SetTradeRequestsEnabled", "RemoteFunction"); // C->S: (enabled) -> the setting as stored
 
 // outgoing requests waiting on a reply: requesterUserId -> targetUserId
 const pending = new Map<number, number>();
+
+// players who switched incoming trade requests off. Lasts for the session, not saved.
+const requestsOff = new Set<Player>();
 
 // an active trade between two players
 interface TradeSession {
@@ -60,6 +64,7 @@ export function buildPlayerList(exclude: Player): TradePlayerInfo[] {
 			name: other.Name,
 			displayName: other.DisplayName,
 			state: Presence.get(other),
+			acceptsTrades: !requestsOff.has(other),
 		});
 	}
 	return list;
@@ -277,6 +282,7 @@ export function init() {
 
 		// both have to be free (re-checked here, never trust the client's list)
 		if (!Presence.isAvailable(from) || !Presence.isAvailable(target)) return;
+		if (requestsOff.has(target)) return; // they opted out; the client's list is not trusted for this
 		if (pending.has(from.UserId)) return; // one outgoing request at a time
 
 		pending.set(from.UserId, targetUserId);
@@ -297,8 +303,18 @@ export function init() {
 		handleRespond(responder, fromUserId, accept);
 	});
 
+	// a player switching their own incoming trade requests on or off
+	setTradeRequestsEnabled.OnServerInvoke = (player, enabled) => {
+		if (typeIs(enabled, "boolean")) {
+			if (enabled) requestsOff.delete(player);
+			else requestsOff.add(player);
+		}
+		return !requestsOff.has(player);
+	};
+
 	// if someone leaves mid-trade, tear the session down and free the other player
 	Players.PlayerRemoving.Connect((player) => {
+		requestsOff.delete(player);
 		const session = sessions.get(player.UserId);
 		if (session !== undefined) endSession(session);
 	});
