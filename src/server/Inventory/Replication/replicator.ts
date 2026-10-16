@@ -12,7 +12,7 @@ const askForInventory = remote("AskForInventory", "RemoteFunction");
 // client to server
 const requestEquip = remote("RequestEquip", "RemoteEvent");
 
-// server to all clients: a player died, play their equipped death effect at `position`
+// server to all clients: a player got a kill, play their equipped death effect where the victim died
 const deathEffect = remote("DeathEffect", "RemoteEvent");
 
 // Send core

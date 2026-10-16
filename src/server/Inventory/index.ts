@@ -1,4 +1,4 @@
-import { Players } from "@rbxts/services";
+import { Players, RunService } from "@rbxts/services";
 import ProfileStore, { Profile } from "@rbxts/profile-store";
 import { InventoryStateType } from "./Data/InventoryState";
 import { Operations } from "./Operations/Operations";
@@ -16,6 +16,9 @@ export const EquipChanged = new Instance("BindableEvent");
 
 // Fires (player) once that player's inventory session has finished loading.
 const InventoryLoaded = new Instance("BindableEvent");
+
+// Number attribute the weapon code sets on a character it is about to kill: the shooter's UserId.
+const KILLER_ATTRIBUTE = "KillerUserId";
 
 // Per-session-only: did this life's character die yet? Not save data, so it
 // doesn't live on the profile — separate from persistence entirely.
@@ -82,7 +85,7 @@ function onPlayerAdded(player: Player) {
 	player.CharacterAdded.Connect((character) => {
 		character.FindFirstChildWhichIsA("Humanoid")!.Died.Once(() => {
 			died.add(player);
-			fireDeathEffect(character, inv);
+			fireKillEffect(player, character);
 		});
 
 		if (died.has(player)) {
@@ -116,17 +119,44 @@ export function waitForState(player: Player) {
 	return getState(player);
 }
 
-function fireDeathEffect(character: Model, inv: Profile<InventoryStateType>) {
-	const root = character.FindFirstChild("HumanoidRootPart") as BasePart | undefined;
-	if (root === undefined) return;
+// A kill plays the shooter's equipped death effect on the victim, attached to the victim's
+// root part. The legacy weapon code names the shooter by setting KILLER_ATTRIBUTE on the
+// victim's character before it kills them. A death with no shooter recorded (fall, reset,
+// leaving the map) plays nothing.
+function fireKillEffect(victim: Player, character: Model) {
+	const killerId = character.GetAttribute(KILLER_ATTRIBUTE);
+	if (!typeIs(killerId, "number")) {
+		studioLog(`${victim.Name} died with no ${KILLER_ATTRIBUTE} on their character, so no effect`);
+		return;
+	}
 
-	const equippedId = inv.Data.equipped[WeaponSlot.DeathEffect] ?? DEFAULT_SKINS.get(WeaponSlot.DeathEffect);
-	if (equippedId === undefined) return;
+	const killer = Players.GetPlayerByUserId(killerId);
+	if (killer === undefined || killer === victim) {
+		studioLog(`${victim.Name}'s killer (${killerId}) is not in the server or is themselves, so no effect`);
+		return;
+	}
 
-	const def = getDef(equippedId);
-	if (def === undefined || def.model === undefined || def.model === "") return;
+	const equipped = inventories.get(killer)?.Data.equipped[WeaponSlot.DeathEffect];
+	const equippedId = equipped ?? DEFAULT_SKINS.get(WeaponSlot.DeathEffect);
+	const def = equippedId !== undefined ? getDef(equippedId) : undefined;
+	if (def === undefined || def.model === undefined || def.model === "") {
+		studioLog(`${killer.Name}'s death effect (${tostring(equippedId)}) has no model, so no effect`);
+		return;
+	}
 
-	Replicator.sendDeathEffect(root.Position, def.model);
+	// Taken now, while the body is certainly there: a death or ragdoll script may move or
+	// remove the root part straight after. The effect plays at this spot and stays put.
+	const root = character.FindFirstChild("HumanoidRootPart");
+	const position = root !== undefined && root.IsA("BasePart") ? root.Position : character.GetPivot().Position;
+
+	studioLog(`${killer.Name} killed ${victim.Name}: playing "${def.model}" at ${tostring(position)}`);
+	Replicator.sendDeathEffect(position, def.model);
+}
+
+// Explains in the Output window why a kill effect did or didn't play. Studio only, so live
+// servers stay quiet.
+function studioLog(message: string) {
+	if (RunService.IsStudio()) print(`[DeathEffect] ${message}`);
 }
 
 export function addItem(player: Player, itemId: string) {
