@@ -229,6 +229,10 @@ function handleConfirm(player: Player) {
 	if (session === undefined) return;
 
 	const isA = session.a === player;
+	// Already accepted: pressing again must not restart a countdown that is already running.
+	// Changing the offer clears the accept, so a real re-accept still goes through.
+	if (isA ? session.confirmedA : session.confirmedB) return;
+
 	if (isA) session.confirmedA = true;
 	else session.confirmedB = true;
 	broadcastReady(session);
@@ -312,11 +316,25 @@ export function init() {
 		return !requestsOff.has(player);
 	};
 
-	// if someone leaves mid-trade, tear the session down and free the other player
+	// if someone leaves mid-trade, tear the session down and notify the other player so their
+	// UI doesn't sit open forever; also drop any pending request they sent or were the target
+	// of, or the other side of a request-not-yet-answered would be stuck unable to re-request.
 	Players.PlayerRemoving.Connect((player) => {
 		requestsOff.delete(player);
+
+		const staleRequests: number[] = [];
+		for (const [requesterId, targetId] of pending) {
+			if (requesterId === player.UserId || targetId === player.UserId) staleRequests.push(requesterId);
+		}
+		for (const requesterId of staleRequests) pending.delete(requesterId);
+
 		const session = sessions.get(player.UserId);
-		if (session !== undefined) endSession(session);
+		if (session !== undefined) {
+			const other = session.a === player ? session.b : session.a;
+			tradeComplete.FireClient(other, false);
+			endSession(session);
+			print(`[Trade] ${player.Name} disconnected mid-trade with ${other.Name}`);
+		}
 	});
 
 	// hook chat for the temp accept flow
