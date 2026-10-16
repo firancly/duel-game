@@ -20,7 +20,7 @@
 			"label": "rojo: serve",
 			"type": "shell",
 			"command": "rojo",
-			"args": ["serve"],
+			"args": ["serve", "--port", "34873"],
 			"isBackground": true,
 			"problemMatcher": [],
 			"presentation": {
