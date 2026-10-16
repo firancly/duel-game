@@ -30,7 +30,8 @@ export interface LimitedOffer {
 
 // prettier-ignore
 export const Limiteds: LimitedOffer[] = [
-	{ key: "Limited", id: 3710307602, name: "Monster Bundle", skinIds: ["monster_knife", "monster_revolver", "monster_rifle"], giftProductId: 3711119580 }, // Monster
+	// TODO: skinIds placeholder until the Halloween Pack's exclusive skins are decided
+	{ key: "Limited", id: 3715179443, name: "Halloween Pack", skinIds: [], giftProductId: 3715179509 }, // Halloween, 699 R$ / gift 629 R$
 ];
 
 export function findLimitedByKey(key: string): LimitedOffer | undefined {

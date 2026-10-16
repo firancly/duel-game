@@ -9,6 +9,7 @@ import { Cases } from "shared/Cases";
 import { CoinOffer, CoinProducts, LimitedOffer, Limiteds } from "shared/Monetization";
 import { GamepassOffer, Gamepasses, findGamepassByKey } from "shared/Gamepasses";
 import { CaseResultPayload } from "shared/types/Shop";
+import { trackTagged } from "../UI/Tags";
 import * as WindowManager from "../UI/WindowManager";
 import * as CratePresenter from "./CratePresenter";
 
@@ -152,30 +153,31 @@ function limitedFrame(offer: LimitedOffer): Instance | undefined {
 	return limitedsContent.FindFirstChild(offer.key);
 }
 
+const TAG_LIMITED_BUY = "LimitedBundleBuy";
+const boundLimitedButtons = new Set<GuiButton>();
+
 function wireLimited(offer: LimitedOffer) {
-	const frame = limitedFrame(offer);
-	const buyBtn = frame?.FindFirstChild("Buy") as ImageButton | undefined;
-	if (buyBtn === undefined) {
-		warn(`[Shop] no Buy button for limited "${offer.key}"`);
-		return;
-	}
+	trackTagged<ImageButton>(TAG_LIMITED_BUY, (buyBtn) => {
+		if (boundLimitedButtons.has(buyBtn)) return;
+		boundLimitedButtons.add(buyBtn);
 
-	const label = buyBtn.FindFirstChild("TextLabel") as TextLabel | undefined;
-	if (label !== undefined && offer.id !== 0) {
-		const [ok, info] = pcall(() => MarketplaceService.GetProductInfo(offer.id, Enum.InfoType.Product));
-		const price = ok ? (info as { PriceInRobux?: number }).PriceInRobux : undefined;
-		if (price !== undefined) label.Text = `R$${price}`;
-	}
-
-	buyBtn.Activated.Connect(() => {
-		print(`[Shop] clicked limited ${offer.key} (id ${offer.id})`);
-		if (offer.id === 0) {
-			systemMessage("This item isn't set up yet — check back later.");
-			return;
+		const label = buyBtn.FindFirstChild("TextLabel") as TextLabel | undefined;
+		if (label !== undefined && offer.id !== 0) {
+			const [ok, info] = pcall(() => MarketplaceService.GetProductInfo(offer.id, Enum.InfoType.Product));
+			const price = ok ? (info as { PriceInRobux?: number }).PriceInRobux : undefined;
+			if (price !== undefined) label.Text = `R$${price}`;
 		}
-		MarketplaceService.PromptProductPurchase(player, offer.id);
+
+		buyBtn.Activated.Connect(() => {
+			print(`[Shop] clicked limited ${offer.key} (id ${offer.id})`);
+			if (offer.id === 0) {
+				systemMessage("This item isn't set up yet — check back later.");
+				return;
+			}
+			MarketplaceService.PromptProductPurchase(player, offer.id);
+		});
+		// print(`[Shop] Wired limited ${offer.key} → id ${offer.id}`);
 	});
-	// print(`[Shop] Wired limited ${offer.key} → id ${offer.id}`);
 }
 
 for (const offer of Limiteds) wireLimited(offer);
@@ -188,8 +190,6 @@ function formatCount(amount: number): string {
 }
 
 function labelOffer(btn: Instance, offer: CoinOffer) {
-	// The amount on the card comes from the same table the server grants from, so the
-	// two can't drift apart.
 	const amountLabel = btn.FindFirstChild("AmountCoins");
 	if (amountLabel !== undefined && amountLabel.IsA("TextLabel")) amountLabel.Text = formatCount(offer.coins);
 
@@ -248,7 +248,7 @@ function gamepassFrame(gp: GamepassOffer): Instance | undefined {
 	return gamepassesContent.FindFirstChild(GAMEPASS_CARDS[gp.key] ?? gp.key);
 }
 
-// the gamepass cards carry their name + price, fill them from the Gamepasses table
+// fill gamepass data
 for (const gp of Gamepasses) {
 	const frame = gamepassFrame(gp);
 	if (frame === undefined) continue;
