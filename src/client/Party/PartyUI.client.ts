@@ -3,10 +3,7 @@ import { MAX_PARTY_SIZE } from "shared/Party";
 import { onTaggedButton, trackTagged } from "../UI/Tags";
 import * as WindowManager from "../UI/WindowManager";
 
-// The party window. Replaces the old Luau party script and behaves the same way.
-//
-// Every piece is picked up at its authored path under NEW_MAIN_UI.MainFrame, so nothing
-// has to be tagged. Tagging a piece as well lets it be moved or renamed in Studio:
+// Every piece is picked up at its authored path under NEW_MAIN_UI.MainFrame. tagging is unecessary
 //   PartyPanel         the Party frame that opens and closes
 //   PartyOpen          the button that toggles it
 //   PartySlots         the PartyPlayers frame holding the member slot buttons
@@ -67,9 +64,7 @@ function canInvite(): boolean {
 	return !isInParty() || isLeader();
 }
 
-// Shows the placeholder straight away and swaps in the headshot once it has loaded. The
-// image is stamped with the user it is waiting for, so a slow load can't land on a slot
-// that has since been given to someone else.
+// Shows the placeholder straight away and swaps in the headshot once it has loaded
 function loadAvatar(image: ImageLabel, userId: number) {
 	image.SetAttribute("UserId", userId);
 
@@ -125,7 +120,7 @@ function createSlotAvatar(slot: GuiButton): ImageLabel {
 	return avatar;
 }
 
-// A filled slot shows the member's headshot; an empty one shows its authored "+" label.
+// A filled slot shows the member's headshot an empty one shows its authored "+" label.
 function renderSlot(slot: GuiButton, member: Player | undefined) {
 	const plus = slot.FindFirstChild("TextLabel");
 	if (plus !== undefined && plus.IsA("GuiObject")) plus.Visible = member === undefined;
@@ -145,7 +140,7 @@ const boundSlots = new Set<GuiButton>();
 function renderSlots(container: Instance) {
 	const shown = isInParty() ? members : [player];
 	slotsOf(container).forEach((slot, i) => {
-		// pressing any slot refreshes the invite list, as the old script did
+		// pressing any slot refreshes the invite list
 		if (!boundSlots.has(slot)) {
 			boundSlots.add(slot);
 			slot.Activated.Connect(() => renderLists());
