@@ -159,6 +159,21 @@ function bindTagged(tag: string, fallback: Instance | undefined, onPressed: () =
 	trackTagged<GuiButton>(tag, bind);
 }
 
+// Accept button swaps to "YOU'RE READY" once you've confirmed
+const ACCEPT_IDLE_TEXT = "ACCEPT";
+let amIReady = false;
+
+function acceptButtonLabel(button: GuiButton): TextLabel | undefined {
+	const label = button.FindFirstChild("Title") ?? button.FindFirstChildWhichIsA("TextLabel");
+	return label !== undefined && label.IsA("TextLabel") ? label : undefined;
+}
+
+function renderAcceptButton(button: GuiButton) {
+	const label = acceptButtonLabel(button);
+	if (label === undefined) return;
+	label.Text = amIReady ? "YOU'RE READY" : ACCEPT_IDLE_TEXT;
+}
+
 function recordFromMap(m: Map<string, number>): { [id: string]: number } {
 	const out: { [id: string]: number } = {};
 	for (const [k, v] of m) out[k] = v;
@@ -451,7 +466,15 @@ function renderTheirOffer(record: { [id: string]: number }) {
 offerUpdated.OnClientEvent.Connect((record: unknown) => renderTheirOffer(record as { [id: string]: number }));
 
 // confirm / cancel / complete
+const acceptButtons = trackTagged<GuiButton>(
+	TAG_TRADE_ACCEPT,
+	renderAcceptButton,
+	acceptFallback !== undefined && acceptFallback.IsA("GuiButton") ? acceptFallback : undefined,
+);
+
 bindTagged(TAG_TRADE_ACCEPT, acceptFallback, () => {
+	amIReady = true;
+	for (const button of acceptButtons) renderAcceptButton(button);
 	confirmTrade.FireServer();
 	systemMessage("You accepted. Waiting for the other player...");
 });
@@ -463,6 +486,8 @@ const NOT_READY_COLOR = Color3.fromRGB(204, 23, 23);
 
 // personalized: (youReady, theirReady) from this viewer's side
 tradeConfirmed.OnClientEvent.Connect((youReady: boolean, theirReady: boolean) => {
+	amIReady = youReady; // server-confirmed, stays in sync even after a UI reopen
+	for (const button of acceptButtons) renderAcceptButton(button);
 	youReadyLabel.BackgroundColor3 = youReady ? READY_COLOR : NOT_READY_COLOR;
 	theirReadyLabel.BackgroundColor3 = theirReady ? READY_COLOR : NOT_READY_COLOR;
 });
@@ -486,12 +511,14 @@ function resetOffer() {
 	theirCount.Text = `OFFER (0/${MAX_OFFER})`;
 	youReadyLabel.BackgroundColor3 = NOT_READY_COLOR;
 	theirReadyLabel.BackgroundColor3 = NOT_READY_COLOR;
+	amIReady = false;
+	for (const button of acceptButtons) renderAcceptButton(button);
 	syncOffer(); // clear the other side's view too
 }
 
 tradeStarted.OnClientEvent.Connect((otherUserId: number, otherDisplayName: string) => {
 	WindowManager.open("Trade"); // covers accepting an invite while the list was never opened
-	WindowManager.setBlocked(true); // pinned — no Shop/Inventory until this trade ends
+	WindowManager.setBlocked(true); // pinned, no Shop/Inventory until this trade ends
 	tradeGui.Visible = false;
 	listOpen = false;
 
