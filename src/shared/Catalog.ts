@@ -798,7 +798,7 @@ export const Catalog = new Map<string, SkinDef>([
 			rarity: Rarity.Epic,
 			tradeable: true,
 			caseId: "HalloweenCase",
-			model: "ShadowRifle",
+			model: "SpectralRifle",
 		},
 	],
 	[
