@@ -183,11 +183,22 @@ function teleportLocalPlayers(message: MatchFoundMessage) {
 	}
 }
 
-function runMatcherLoop(mode: Mode) {
+// Set true right as the server starts shutting down, so the loop below stops issuing new
+// MemoryStore calls instead of leaving one in flight when Studio's Stop button is pressed —
+// an in-flight cloud call at that point is what makes Studio hang for a minute or two.
+let shuttingDown = false;
+
+// One loop cycling through every mode in turn, not one loop per mode: at most a single
+// MemoryStore call in flight at any moment, instead of up to five in parallel.
+function runMatcherLoop() {
 	task.spawn(() => {
-		while (true) {
+		while (!shuttingDown) {
 			task.wait(MATCHER_INTERVAL_SECONDS);
-			tryFillMatch(mode);
+			if (shuttingDown) break;
+			for (const [mode] of pairs(MODES)) {
+				if (shuttingDown) break;
+				tryFillMatch(mode as Mode);
+			}
 		}
 	});
 }
@@ -197,9 +208,13 @@ export function init() {
 		teleportLocalPlayers(message.Data as MatchFoundMessage);
 	});
 
-	for (const [mode] of pairs(MODES)) runMatcherLoop(mode as Mode);
+	runMatcherLoop();
 
 	Players.PlayerRemoving.Connect((player) => cancelMatch(player));
+
+	game.BindToClose(() => {
+		shuttingDown = true;
+	});
 
 	print("[Matchmaking Service] Initialized");
 }
